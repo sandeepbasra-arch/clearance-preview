@@ -87,128 +87,150 @@ const MOCK_CLEARANCES = [
 const isStandalone = typeof geotab === 'undefined';
 
 // MyGeotab navigation structure - matches actual MyGeotab pillars and menu items
-// Based on MyGeotab Product Guide and SDK documentation
+// securityIds is an array of patterns to match against security identifiers
+// Uses partial matching (case-insensitive) to handle varying naming conventions
 const navigationStructure = [
     {
         name: 'Dashboard',
         icon: '📊',
-        securityId: 'Dashboard',
+        securityIds: ['Dashboard'],
         children: []
     },
     {
         name: 'Map',
         icon: '🗺️',
-        securityId: 'ViewMap',
+        securityIds: ['Map', 'ViewMap', 'LiveMap', 'AdministerLiveMap'],
         children: []
     },
     {
         name: 'Assets',
         icon: '🚗',
-        securityId: 'DeviceList',
+        securityIds: ['Device', 'Asset', 'Vehicle', 'Trailer'],
         children: [
-            { name: 'Vehicles', securityId: 'DeviceList' },
-            { name: 'Trailers', securityId: 'DeviceList' },
-            { name: 'Add Asset', securityId: 'DeviceAdmin' }
+            { name: 'Vehicles', securityIds: ['Device', 'Vehicle'] },
+            { name: 'Trailers', securityIds: ['Trailer', 'Device'] },
+            { name: 'Add Asset', securityIds: ['DeviceAdmin'] }
         ]
     },
     {
         name: 'Productivity',
         icon: '📈',
-        securityId: 'TripsActivityReport',
+        securityIds: ['Trip', 'Route', 'Zone', 'Productivity'],
         children: [
-            { name: 'Trips History', securityId: 'TripsActivityReport' },
-            { name: 'Routes', securityId: 'RouteList' },
-            { name: 'Zones', securityId: 'ZoneList' },
-            { name: 'Zone Visits', securityId: 'ZoneList' },
-            { name: 'Speed Profile', securityId: 'SpeedProfileReport' },
-            { name: 'Driver Congregation', securityId: 'DriverCongregation' }
+            { name: 'Trips History', securityIds: ['Trip'] },
+            { name: 'Routes', securityIds: ['Route'] },
+            { name: 'Zones', securityIds: ['Zone'] },
+            { name: 'Zone Visits', securityIds: ['Zone'] },
+            { name: 'Speed Profile', securityIds: ['Speed', 'Trip'] },
+            { name: 'Driver Congregation', securityIds: ['Congregation', 'Driver'] }
         ]
     },
     {
         name: 'Safety',
         icon: '🛡️',
-        securityId: 'RiskManagement',
+        securityIds: ['Safety', 'Risk', 'Exception', 'Collision'],
         children: [
-            { name: 'Collision Risk', securityId: 'CollisionRisk' },
-            { name: 'Risk Management', securityId: 'RiskManagement' },
-            { name: 'Driver Safety Scorecard', securityId: 'DriverSafetyScorecard' },
-            { name: 'Exceptions', securityId: 'ExceptionsList' },
-            { name: 'Aggressive Driving', securityId: 'AggressiveDriving' }
+            { name: 'Collision Risk', securityIds: ['Collision', 'Risk'] },
+            { name: 'Risk Management', securityIds: ['Risk'] },
+            { name: 'Driver Safety Scorecard', securityIds: ['Safety', 'Scorecard', 'Driver'] },
+            { name: 'Exceptions', securityIds: ['Exception'] },
+            { name: 'Aggressive Driving', securityIds: ['Aggressive', 'Driving'] }
         ]
     },
     {
         name: 'Compliance',
         icon: '✅',
-        securityId: 'HOSLogs',
+        securityIds: ['HOS', 'DVIR', 'Tachograph', 'Compliance', 'FuelTax', 'IFTA'],
         children: [
-            { name: 'HOS Logs', securityId: 'HOSLogs' },
-            { name: 'HOS Availability', securityId: 'HOSAvailability' },
-            { name: 'DVIR Logs', securityId: 'DVIRLogs' },
-            { name: 'Tachograph', securityId: 'Tachograph' },
-            { name: 'IFTA/Fuel Tax', securityId: 'FuelTaxReport' },
-            { name: 'Emissions Diagnostics', securityId: 'EmissionsDiagnostics' }
+            { name: 'HOS Logs', securityIds: ['HOS'] },
+            { name: 'HOS Availability', securityIds: ['HOS'] },
+            { name: 'DVIR Logs', securityIds: ['DVIR'] },
+            { name: 'Tachograph', securityIds: ['Tachograph'] },
+            { name: 'IFTA/Fuel Tax', securityIds: ['FuelTax', 'IFTA'] },
+            { name: 'Emissions Diagnostics', securityIds: ['Emission'] }
         ]
     },
     {
         name: 'Maintenance',
         icon: '🔧',
-        securityId: 'MaintenanceReminders',
+        securityIds: ['Maintenance', 'Engine', 'Service', 'Diagnostic'],
         children: [
-            { name: 'Engine Status', securityId: 'EngineStatusDataGraph' },
-            { name: 'Engine Faults', securityId: 'EngineFaults' },
-            { name: 'Maintenance Reminders', securityId: 'MaintenanceReminders' },
-            { name: 'Maintenance Schedule', securityId: 'MaintenanceSchedule' },
-            { name: 'Service History', securityId: 'ServiceHistory' }
+            { name: 'Engine Status', securityIds: ['Engine', 'Status'] },
+            { name: 'Engine Faults', securityIds: ['Engine', 'Fault'] },
+            { name: 'Maintenance Reminders', securityIds: ['Maintenance'] },
+            { name: 'Maintenance Schedule', securityIds: ['Maintenance'] },
+            { name: 'Service History', securityIds: ['Service', 'Maintenance'] }
         ]
     },
     {
         name: 'Fuel & Energy',
         icon: '⛽',
-        securityId: 'FuelUsageReport',
+        securityIds: ['Fuel', 'Energy', 'EV', 'Charge', 'Battery'],
         children: [
-            { name: 'Fuel Usage', securityId: 'FuelUsageReport' },
-            { name: 'Fuel Economy', securityId: 'FuelEconomy' },
-            { name: 'EV Battery Status', securityId: 'EVBatteryStatus' },
-            { name: 'Charging Sessions', securityId: 'EVChargingSessions' },
-            { name: 'Charge Monitoring', securityId: 'ChargeMonitoring' }
+            { name: 'Fuel Usage', securityIds: ['Fuel'] },
+            { name: 'Fuel Economy', securityIds: ['Fuel', 'Economy'] },
+            { name: 'EV Battery Status', securityIds: ['EV', 'Battery'] },
+            { name: 'Charging Sessions', securityIds: ['Charge', 'EV'] },
+            { name: 'Charge Monitoring', securityIds: ['Charge', 'TimeToCharge'] }
         ]
     },
     {
         name: 'Sustainability',
         icon: '🌱',
-        securityId: 'SustainabilityReport',
+        securityIds: ['Sustainability', 'Emission', 'Electrification', 'Idling'],
         children: [
-            { name: 'Sustainability Center', securityId: 'SustainabilityCenter' },
-            { name: 'Sustainability Overview', securityId: 'SustainabilityReport' },
-            { name: 'Emissions Report', securityId: 'EmissionsReport' },
-            { name: 'Electrification Potential', securityId: 'ElectrificationPotential' },
-            { name: 'Idling Trends', securityId: 'IdlingTrends' }
+            { name: 'Sustainability Center', securityIds: ['Sustainability'] },
+            { name: 'Sustainability Overview', securityIds: ['Sustainability'] },
+            { name: 'Emissions Report', securityIds: ['Emission'] },
+            { name: 'Electrification Potential', securityIds: ['Electrification', 'EV'] },
+            { name: 'Idling Trends', securityIds: ['Idling'] }
         ]
     },
     {
         name: 'Rules & Groups',
         icon: '📋',
-        securityId: 'RuleList',
+        securityIds: ['Rule', 'Group', 'Exception'],
         children: [
-            { name: 'Rules', securityId: 'RuleList' },
-            { name: 'Groups', securityId: 'GroupList' },
-            { name: 'Exception Rules', securityId: 'ExceptionRules' }
+            { name: 'Rules', securityIds: ['Rule'] },
+            { name: 'Groups', securityIds: ['Group'] },
+            { name: 'Exception Rules', securityIds: ['Exception', 'Rule'] }
         ]
     },
     {
         name: 'Administration',
         icon: '⚙️',
-        securityId: 'UserList',
+        securityIds: ['User', 'Driver', 'Security', 'Admin', 'Addin', 'Audit', 'System'],
         children: [
-            { name: 'Users', securityId: 'UserList' },
-            { name: 'Drivers', securityId: 'DriverList' },
-            { name: 'Clearances', securityId: 'SecurityClearanceList' },
-            { name: 'System Settings', securityId: 'SystemSettings' },
-            { name: 'Add-Ins', securityId: 'ManageAddinsClearance' },
-            { name: 'Audit Log', securityId: 'AuditLog' }
+            { name: 'Users', securityIds: ['User'] },
+            { name: 'Drivers', securityIds: ['Driver'] },
+            { name: 'Clearances', securityIds: ['Security', 'Clearance'] },
+            { name: 'System Settings', securityIds: ['System', 'Setting'] },
+            { name: 'Add-Ins', securityIds: ['Addin'] },
+            { name: 'Audit Log', securityIds: ['Audit'] }
         ]
     }
 ];
+
+/**
+ * Check if a security identifier matches any of the patterns
+ * Uses case-insensitive partial matching
+ */
+function matchesSecurityPattern(securityId, patterns) {
+    const idLower = securityId.toLowerCase();
+    return patterns.some(pattern => idLower.includes(pattern.toLowerCase()));
+}
+
+/**
+ * Check if any allowed feature matches the patterns for a nav item
+ */
+function hasAccessToNavItem(allowedFeatures, patterns) {
+    for (const feature of allowedFeatures) {
+        if (matchesSecurityPattern(feature, patterns)) {
+            return true;
+        }
+    }
+    return false;
+}
 
 // Shared state
 let api = null;
@@ -446,16 +468,16 @@ function openModal(clearance) {
     console.log('Security filters:', securityFilters);
     console.log('Allowed features:', Array.from(allowedFeatures));
 
-    // Render navigation preview
+    // Render navigation preview using pattern-based matching
     navPreview.innerHTML = navigationStructure.map(navItem => {
-        const hasAccess = isFullAccess || allowedFeatures.has(navItem.securityId);
+        const hasAccess = isFullAccess || hasAccessToNavItem(allowedFeatures, navItem.securityIds);
         const accessClass = hasAccess ? 'has-access' : 'no-access';
 
         let childrenHtml = '';
         if (navItem.children.length > 0) {
             childrenHtml = '<ul class="nav-children">' +
                 navItem.children.map(child => {
-                    const childHasAccess = isFullAccess || allowedFeatures.has(child.securityId);
+                    const childHasAccess = isFullAccess || hasAccessToNavItem(allowedFeatures, child.securityIds);
                     const childClass = childHasAccess ? 'has-access' : 'no-access';
                     return `<li class="${childClass}">
                         ${child.name}
@@ -475,15 +497,15 @@ function openModal(clearance) {
         `;
     }).join('');
 
-    // Calculate access stats
+    // Calculate access stats using pattern-based matching
     let totalFeatures = 0;
     let accessibleCount = 0;
     navigationStructure.forEach(item => {
         totalFeatures++;
-        if (isFullAccess || allowedFeatures.has(item.securityId)) accessibleCount++;
+        if (isFullAccess || hasAccessToNavItem(allowedFeatures, item.securityIds)) accessibleCount++;
         item.children.forEach(child => {
             totalFeatures++;
-            if (isFullAccess || allowedFeatures.has(child.securityId)) accessibleCount++;
+            if (isFullAccess || hasAccessToNavItem(allowedFeatures, child.securityIds)) accessibleCount++;
         });
     });
     const accessPercentage = Math.round((accessibleCount / totalFeatures) * 100);
