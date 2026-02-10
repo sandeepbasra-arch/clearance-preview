@@ -659,39 +659,36 @@ function renderModalContent(clearance, securityFilters, resolvedNames) {
         if (filter.securityIdentifier) {
             allowedFeatures.add(filter.securityIdentifier);
         }
-        // Format 2: { securityId: { id: 'GroupXxxSecurityId' } } - resolve to actual name
+        // Format 2: { securityId: { id: '...', name: '...' } } - use the name property directly!
         if (filter.securityId) {
             if (typeof filter.securityId === 'string') {
                 allowedFeatures.add(filter.securityId);
-            } else if (filter.securityId.id) {
-                const id = filter.securityId.id;
-
-                // Use resolved name from API lookup or global security ID map
-                let resolvedName = resolvedNames.get(id) || securityIdMap.get(id);
-                if (resolvedName) {
-                    allowedFeatures.add(resolvedName);
-                    // Also add cleaned version for pattern matching
-                    const cleanName = resolvedName.replace(/Security$/, '');
-                    if (cleanName !== resolvedName) {
+            } else {
+                // The securityId object often contains the name directly!
+                if (filter.securityId.name) {
+                    let name = filter.securityId.name;
+                    allowedFeatures.add(name);
+                    // Clean up common patterns
+                    if (name.startsWith('SecurityId') && name.endsWith('Id')) {
+                        const cleanName = name.replace(/^SecurityId/, '').replace(/Id$/, '');
                         allowedFeatures.add(cleanName);
                     }
-                    console.log(`Resolved via map: ${id} -> ${resolvedName}`);
+                    console.log(`Using securityId.name: ${name}`);
                 }
 
-                // Also add the raw ID
-                allowedFeatures.add(id);
+                // Also handle the id for pattern matching
+                if (filter.securityId.id) {
+                    const id = filter.securityId.id;
+                    allowedFeatures.add(id);
 
-                // Extract feature name from various ID formats:
-                // 'SecurityIdViewDriverSafetyId' -> 'ViewDriverSafety'
-                // 'GroupViewDeviceDataSecurityId' -> 'ViewDeviceData'
-                if (id.startsWith('SecurityId') && id.endsWith('Id')) {
-                    const cleanId = id.replace(/^SecurityId/, '').replace(/Id$/, '');
-                    allowedFeatures.add(cleanId);
-                    console.log(`Extracted from SecurityId pattern: ${id} -> ${cleanId}`);
-                } else if (id.startsWith('Group') && id.endsWith('SecurityId')) {
-                    const cleanId = id.replace(/^Group/, '').replace(/SecurityId$/, '');
-                    allowedFeatures.add(cleanId);
-                    console.log(`Extracted from Group pattern: ${id} -> ${cleanId}`);
+                    // Extract feature name from ID patterns
+                    if (id.startsWith('SecurityId') && id.endsWith('Id')) {
+                        const cleanId = id.replace(/^SecurityId/, '').replace(/Id$/, '');
+                        allowedFeatures.add(cleanId);
+                    } else if (id.startsWith('Group') && id.endsWith('SecurityId')) {
+                        const cleanId = id.replace(/^Group/, '').replace(/SecurityId$/, '');
+                        allowedFeatures.add(cleanId);
+                    }
                 }
             }
         }
