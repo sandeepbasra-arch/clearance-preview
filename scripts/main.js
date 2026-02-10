@@ -569,6 +569,15 @@ function renderModalContent(clearance, securityFilters) {
     const hasAllAddFalse = securityFilters.length > 0 && securityFilters.every(f => f.isAdd === false);
     const isExceptPattern = hasAllAddFalse && !hasAnyAddTrue;
 
+    // Check how many filters are add-in specific vs main navigation
+    const mainNavFilters = securityFilters.filter(f =>
+        !f.securityId || !f.securityId.customPageName || f.securityId.customPageName === ''
+    );
+    const addinFilters = securityFilters.filter(f =>
+        f.securityId && f.securityId.customPageName && f.securityId.customPageName !== ''
+    );
+    console.log('Main nav filters:', mainNavFilters.length, 'Add-in filters:', addinFilters.length);
+
     console.log('Security filter pattern: isExceptPattern =', isExceptPattern, '(inherits full access, removes specific items)');
 
     // Helper to extract feature names from a filter
@@ -604,9 +613,21 @@ function renderModalContent(clearance, securityFilters) {
 
     securityFilters.forEach(filter => {
         const featureNames = extractFeatureNames(filter);
+
+        // Check if this is an add-in specific permission (has customPageName)
+        // Add-in specific permissions don't affect main navigation
+        const isAddinSpecific = filter.securityId &&
+                                filter.securityId.customPageName &&
+                                filter.securityId.customPageName !== '';
+
         if (filter.isAdd === false) {
             // This permission is being DENIED/REMOVED
-            featureNames.forEach(name => deniedFeatures.add(name));
+            // Only track as denied if it's a main navigation feature, not add-in specific
+            if (!isAddinSpecific) {
+                featureNames.forEach(name => deniedFeatures.add(name));
+            } else {
+                console.log('Skipping add-in specific denied permission:', filter.securityId.name, 'for', filter.securityId.customPageName);
+            }
         } else {
             // This permission is being GRANTED
             featureNames.forEach(name => allowedFeatures.add(name));
