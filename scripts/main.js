@@ -551,55 +551,30 @@ function openModal(clearance) {
         // Some databases use SecurityIdentifier type, others use Group
         const calls = securityIdRefs.map(id => ['Get', { typeName: 'SecurityIdentifier', search: { id: id } }]);
 
-        api.multiCall(calls, function(results) {
+        // Try to resolve IDs via Group lookup (SecurityIdentifier type may not exist)
+        const groupCalls = securityIdRefs.map(id => ['Get', { typeName: 'Group', search: { id: id } }]);
+
+        api.multiCall(groupCalls, function(results) {
             const resolvedNames = new Map();
-            let unresolvedIds = [];
 
             results.forEach((result, index) => {
                 if (result && result.length > 0) {
-                    const secId = result[0];
-                    let name = secId.name || '';
+                    const group = result[0];
+                    let name = group.name || '';
                     // Clean up the name - remove ** markers
                     name = name.replace(/^\*\*/, '').replace(/\*\*$/, '');
                     if (name) {
                         resolvedNames.set(securityIdRefs[index], name);
-                        console.log(`Resolved SecurityIdentifier ${securityIdRefs[index]} -> ${name}`);
-                    } else {
-                        unresolvedIds.push(securityIdRefs[index]);
+                        console.log(`Resolved Group ${securityIdRefs[index]} -> ${name}`);
                     }
-                } else {
-                    unresolvedIds.push(securityIdRefs[index]);
                 }
             });
 
-            // If some IDs weren't resolved as SecurityIdentifier, try as Group
-            if (unresolvedIds.length > 0) {
-                console.log('Trying to resolve remaining IDs as Groups:', unresolvedIds);
-                const groupCalls = unresolvedIds.map(id => ['Get', { typeName: 'Group', search: { id: id } }]);
-
-                api.multiCall(groupCalls, function(groupResults) {
-                    groupResults.forEach((result, index) => {
-                        if (result && result.length > 0) {
-                            const group = result[0];
-                            let name = group.name || '';
-                            name = name.replace(/^\*\*/, '').replace(/\*\*$/, '');
-                            if (name) {
-                                resolvedNames.set(unresolvedIds[index], name);
-                                console.log(`Resolved Group ${unresolvedIds[index]} -> ${name}`);
-                            }
-                        }
-                    });
-                    renderModalContent(clearance, securityFilters, resolvedNames);
-                }, function(error) {
-                    console.error('Error resolving as Groups:', error);
-                    renderModalContent(clearance, securityFilters, resolvedNames);
-                });
-            } else {
-                renderModalContent(clearance, securityFilters, resolvedNames);
-            }
+            // Render with whatever we resolved - pattern extraction happens in renderModalContent
+            renderModalContent(clearance, securityFilters, resolvedNames);
         }, function(error) {
-            console.error('Error resolving security IDs:', error);
-            // Fall back to rendering without resolved names
+            console.warn('Could not resolve security IDs via API, using pattern extraction:', error);
+            // Proceed with pattern extraction only (happens in renderModalContent)
             renderModalContent(clearance, securityFilters, new Map());
         });
     } else {
