@@ -333,6 +333,53 @@ let api = null;
 let state = null;
 let clearances = [];
 let securityIdentifiers = [];
+let securityIdMap = new Map(); // Maps security IDs to their names
+
+/**
+ * Build a map of all security identifiers by fetching the security group tree
+ */
+function buildSecurityIdMap(callback) {
+    if (isStandalone || securityIdMap.size > 0) {
+        callback();
+        return;
+    }
+
+    console.log('Building security ID map...');
+
+    // Fetch all groups that are children of GroupSecurityId
+    api.call('Get', {
+        typeName: 'Group',
+        search: {
+            id: 'GroupSecurityId'
+        }
+    }, function(result) {
+        if (result && result.length > 0) {
+            // Recursively extract all security IDs from the tree
+            function extractIds(groups) {
+                groups.forEach(group => {
+                    if (group.id && group.name) {
+                        let name = group.name.replace(/^\*\*/, '').replace(/\*\*$/, '');
+                        securityIdMap.set(group.id, name);
+                        // Also map the name variants
+                        if (name.endsWith('Security')) {
+                            securityIdMap.set(group.id, name.replace(/Security$/, ''));
+                        }
+                    }
+                    if (group.children && group.children.length > 0) {
+                        extractIds(group.children);
+                    }
+                });
+            }
+            extractIds(result);
+            console.log('Security ID map built with', securityIdMap.size, 'entries');
+            console.log('Security ID map:', Object.fromEntries(securityIdMap));
+        }
+        callback();
+    }, function(error) {
+        console.warn('Could not build security ID map:', error);
+        callback();
+    });
+}
 
 /**
  * Fetch clearances - uses mock data in standalone mode
@@ -614,15 +661,16 @@ function renderModalContent(clearance, securityFilters, resolvedNames) {
             } else if (filter.securityId.id) {
                 const id = filter.securityId.id;
 
-                // Use resolved name if available from API lookup
-                if (resolvedNames.has(id)) {
-                    const resolvedName = resolvedNames.get(id);
+                // Use resolved name from API lookup or global security ID map
+                let resolvedName = resolvedNames.get(id) || securityIdMap.get(id);
+                if (resolvedName) {
                     allowedFeatures.add(resolvedName);
                     // Also add cleaned version for pattern matching
                     const cleanName = resolvedName.replace(/Security$/, '');
                     if (cleanName !== resolvedName) {
                         allowedFeatures.add(cleanName);
                     }
+                    console.log(`Resolved via map: ${id} -> ${resolvedName}`);
                 }
 
                 // Also add the raw ID
@@ -905,7 +953,10 @@ if (isStandalone) {
                 console.log('Clearance Preview: focus() called');
                 api = freshApi;
                 state = freshState;
-                fetchClearances();
+                // Build security ID map first, then fetch clearances
+                buildSecurityIdMap(function() {
+                    fetchClearances();
+                });
             },
 
             blur: function () {
