@@ -617,44 +617,39 @@ function renderModalContent(clearance, securityFilters) {
     securityFilters.forEach(filter => {
         const featureNames = extractFeatureNames(filter);
 
-        // Check if this is a camera/video add-in permission
-        const isCameraAddin = filter.securityId &&
+        // Check if this has a customPageName (add-in specific permission)
+        const hasCustomPage = filter.securityId &&
                               filter.securityId.customPageName &&
-                              filter.securityId.customPageName.toLowerCase().includes('camera');
+                              filter.securityId.customPageName !== '';
 
         if (filter.isAdd === false) {
-            // This permission is being DENIED/REMOVED
-            if (isCameraAddin) {
-                // Camera add-in permissions only affect Video section
-                // Map specific camera permissions to Video nav items
+            // For add-in specific permissions, only handle known denied cases
+            if (hasCustomPage) {
                 const name = filter.securityId.name || '';
-                if (name.includes('LiveVideo')) {
-                    deniedVideoFeatures.add('LiveVideo');
+                // Only ViewCameraLiveVideo actually denies Live Video access
+                // Other camera permissions don't necessarily mean denied
+                if (name === 'ViewCameraLiveVideo') {
                     deniedVideoFeatures.add('Live Video');
+                    console.log('Live Video denied via:', name);
                 }
-                if (name.includes('RecordedVideo')) {
-                    deniedVideoFeatures.add('RecordedVideo');
-                    deniedVideoFeatures.add('Video Events');
-                }
-                if (name.includes('CameraSettings') || name.includes('PairedCameras')) {
-                    deniedVideoFeatures.add('CameraSettings');
-                    deniedVideoFeatures.add('Camera Health');
-                }
-                if (name.includes('ViewExceptions') && isCameraAddin) {
-                    // Video exceptions, not main exceptions
-                    deniedVideoFeatures.add('Video Requests');
-                }
-                console.log('Camera permission denied:', name, '-> Video features:', Array.from(deniedVideoFeatures));
+                // Skip all other add-in permissions - they don't affect main navigation
             } else {
-                // Main navigation permission - but be specific, don't use broad pattern matching
-                // ViewDriverSafety should only affect Driver Safety Scorecard, not all Driver items
+                // Main navigation permission without customPageName
+                // Be very specific - only known denied cases
                 const name = filter.securityId?.name || filter.securityIdentifier || '';
-                if (name === 'ViewDriverSafety' || name.includes('DriverSafety')) {
-                    deniedFeatures.add('DriverSafetyScorecard');
-                    deniedFeatures.add('Driver Safety Scorecard');
-                } else {
-                    featureNames.forEach(n => deniedFeatures.add(n));
+
+                // Skip generic ViewSecurityId - it doesn't deny main nav items
+                if (name === 'ViewSecurityId' || name.includes('SecurityId')) {
+                    console.log('Skipping generic security permission:', name);
+                    return;
                 }
+
+                // ViewDriverSafety specifically affects Driver Safety Scorecard only
+                if (name === 'ViewDriverSafety' || name.includes('DriverSafety')) {
+                    deniedFeatures.add('Driver Safety Scorecard');
+                    console.log('Driver Safety Scorecard denied via:', name);
+                }
+                // Don't add other permissions to denied - isAdd:false in except pattern means inherited
             }
         } else {
             // This permission is being GRANTED
@@ -662,6 +657,7 @@ function renderModalContent(clearance, securityFilters) {
         }
     });
 
+    console.log('Denied main features:', Array.from(deniedFeatures));
     console.log('Denied video features:', Array.from(deniedVideoFeatures));
 
     console.log('Allowed features:', Array.from(allowedFeatures));
