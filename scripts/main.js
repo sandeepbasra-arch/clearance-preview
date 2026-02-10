@@ -239,30 +239,46 @@ function fetchClearances() {
         return;
     }
 
-    // Real MyGeotab mode - get ALL security clearance groups
+    // Real MyGeotab mode - get security clearances from users
     console.log('Fetching security clearances...');
 
-    // Get all groups and filter for security clearances (IDs ending with SecurityId)
     api.call('Get', {
-        typeName: 'Group',
+        typeName: 'User',
         search: {}
-    }, function (allGroups) {
-        console.log('Total groups:', allGroups.length);
+    }, function (users) {
+        console.log('Total users:', users.length);
 
-        // Filter for security clearance groups - they end with "SecurityId"
-        clearances = allGroups.filter(group => {
-            const id = group.id || '';
-            return id.endsWith('SecurityId') && id !== 'GroupSecurityId';
+        // Collect all unique security groups from all users
+        const securityGroupMap = new Map();
+
+        users.forEach(user => {
+            if (user.securityGroups && user.securityGroups.length > 0) {
+                user.securityGroups.forEach(sg => {
+                    if (sg.id && !securityGroupMap.has(sg.id)) {
+                        // Clean up name - remove ** wrapper
+                        let name = sg.name || sg.id;
+                        name = name.replace(/^\*\*/, '').replace(/\*\*$/, '');
+
+                        // Make ID-based names more readable
+                        if (name.startsWith('Group') && name.endsWith('SecurityId')) {
+                            name = name.replace('Group', '').replace('SecurityId', '');
+                            // Add spaces before capitals
+                            name = name.replace(/([A-Z])/g, ' $1').trim();
+                        }
+
+                        securityGroupMap.set(sg.id, {
+                            id: sg.id,
+                            name: name,
+                            comments: sg.comments || ''
+                        });
+                    }
+                });
+            }
         });
 
+        clearances = Array.from(securityGroupMap.values());
         console.log('Security clearances found:', clearances.length);
-        console.log('Clearances:', clearances.map(c => ({ id: c.id, name: c.name })));
-
-        // Clean up names - remove ** wrapper if present
-        clearances = clearances.map(c => ({
-            ...c,
-            name: (c.name || c.id).replace(/^\*\*/, '').replace(/\*\*$/, '')
-        }));
+        console.log('Clearances:', clearances);
 
         // Sort by name
         clearances.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
@@ -271,7 +287,7 @@ function fetchClearances() {
         renderClearances();
 
     }, function (error) {
-        console.error('Failed to load groups:', error);
+        console.error('Failed to load users:', error);
         showError('Failed to load clearances: ' + error.message);
     });
 }
