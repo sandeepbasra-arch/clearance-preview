@@ -1,0 +1,15 @@
+{
+  "name": "Clearance Preview",
+  "supportEmail": "support@geotab.com",
+  "items": [
+    {
+      "page": "clearancePreview",
+      "url": "https://banefully-cacogenic-charlsie.ngrok-free.dev/index.html",
+      "path": "addinsLink/",
+      "menuName": {
+        "en": "Clearance Preview"
+      }
+    }
+  ],
+  "isSigned": false
+}
