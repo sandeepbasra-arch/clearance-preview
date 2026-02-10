@@ -331,7 +331,8 @@ body {
 }
 
 .nav-item:hover {
-    background: var(--myg-bg);
+    background: var(--myg-bg-dark);
+    box-shadow: inset 0 0 0 1px var(--myg-border);
 }
 
 .nav-item.has-access {
@@ -341,15 +342,20 @@ body {
 .nav-item.has-access:hover {
     border-left-color: var(--myg-primary);
     background: var(--myg-primary-light);
+    box-shadow: inset 0 0 0 1px var(--myg-primary);
 }
 
 .nav-item.no-access {
-    opacity: 0.5;
+    opacity: 0.7;
 }
 
 .nav-item.no-access .nav-name {
     text-decoration: line-through;
-    color: var(--myg-text-light);
+    color: #666666;
+}
+
+.nav-item.no-access:hover {
+    background: #FFEBEE;
 }
 
 .nav-icon {
@@ -404,7 +410,8 @@ body {
 }
 
 .nav-children li:hover {
-    background: var(--myg-bg);
+    background: var(--myg-bg-dark);
+    box-shadow: inset 0 0 0 1px var(--myg-border);
 }
 
 .nav-children li.has-access {
@@ -412,10 +419,20 @@ body {
     color: var(--myg-text);
 }
 
+.nav-children li.has-access:hover {
+    background: var(--myg-primary-light);
+    box-shadow: inset 0 0 0 1px var(--myg-primary);
+}
+
 .nav-children li.no-access {
-    opacity: 0.5;
+    opacity: 0.7;
     text-decoration: line-through;
-    color: var(--myg-text-light);
+    color: #666666;
+}
+
+.nav-children li.no-access:hover {
+    background: #FFEBEE;
+    box-shadow: inset 0 0 0 1px #FFCDD2;
 }
 
 .child-badge {
@@ -547,6 +564,13 @@ body {
     border-radius: var(--myg-radius);
     font-size: 12px;
     border: 1px solid var(--myg-border-light);
+    transition: all 0.15s ease;
+    cursor: default;
+}
+
+.feature-item:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .feature-item.allowed {
@@ -555,10 +579,20 @@ body {
     color: #2E7D32;
 }
 
+.feature-item.allowed:hover {
+    background: #C8E6C9;
+    border-color: #4CAF50;
+}
+
 .feature-item.denied {
     background: #FFEBEE;
     border-color: #FFCDD2;
     color: #C62828;
+}
+
+.feature-item.denied:hover {
+    background: #FFCDD2;
+    border-color: #F44336;
 }
 
 .feature-icon {
