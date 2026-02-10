@@ -611,28 +611,58 @@ function renderModalContent(clearance, securityFilters) {
         return names;
     }
 
+    // Track camera/video specific denied permissions separately
+    const deniedVideoFeatures = new Set();
+
     securityFilters.forEach(filter => {
         const featureNames = extractFeatureNames(filter);
 
-        // Check if this is an add-in specific permission (has customPageName)
-        // Add-in specific permissions don't affect main navigation
-        const isAddinSpecific = filter.securityId &&
-                                filter.securityId.customPageName &&
-                                filter.securityId.customPageName !== '';
+        // Check if this is a camera/video add-in permission
+        const isCameraAddin = filter.securityId &&
+                              filter.securityId.customPageName &&
+                              filter.securityId.customPageName.toLowerCase().includes('camera');
 
         if (filter.isAdd === false) {
             // This permission is being DENIED/REMOVED
-            // Only track as denied if it's a main navigation feature, not add-in specific
-            if (!isAddinSpecific) {
-                featureNames.forEach(name => deniedFeatures.add(name));
+            if (isCameraAddin) {
+                // Camera add-in permissions only affect Video section
+                // Map specific camera permissions to Video nav items
+                const name = filter.securityId.name || '';
+                if (name.includes('LiveVideo')) {
+                    deniedVideoFeatures.add('LiveVideo');
+                    deniedVideoFeatures.add('Live Video');
+                }
+                if (name.includes('RecordedVideo')) {
+                    deniedVideoFeatures.add('RecordedVideo');
+                    deniedVideoFeatures.add('Video Events');
+                }
+                if (name.includes('CameraSettings') || name.includes('PairedCameras')) {
+                    deniedVideoFeatures.add('CameraSettings');
+                    deniedVideoFeatures.add('Camera Health');
+                }
+                if (name.includes('ViewExceptions') && isCameraAddin) {
+                    // Video exceptions, not main exceptions
+                    deniedVideoFeatures.add('Video Requests');
+                }
+                console.log('Camera permission denied:', name, '-> Video features:', Array.from(deniedVideoFeatures));
             } else {
-                console.log('Skipping add-in specific denied permission:', filter.securityId.name, 'for', filter.securityId.customPageName);
+                // Main navigation permission - but be specific, don't use broad pattern matching
+                // ViewDriverSafety should only affect Driver Safety Scorecard, not all Driver items
+                const name = filter.securityId?.name || filter.securityIdentifier || '';
+                if (name === 'ViewDriverSafety' || name.includes('DriverSafety')) {
+                    deniedFeatures.add('DriverSafetyScorecard');
+                    deniedFeatures.add('Driver Safety Scorecard');
+                } else {
+                    featureNames.forEach(n => deniedFeatures.add(n));
+                }
             }
         } else {
             // This permission is being GRANTED
             featureNames.forEach(name => allowedFeatures.add(name));
         }
     });
+
+    console.log('Denied video features:', Array.from(deniedVideoFeatures));
 
     console.log('Allowed features:', Array.from(allowedFeatures));
     console.log('Denied features:', Array.from(deniedFeatures));
@@ -662,12 +692,34 @@ function renderModalContent(clearance, securityFilters) {
     console.log('Denied features (exceptions):', Array.from(deniedFeatures));
 
     // Helper to check if a nav item is explicitly denied
-    function isDeniedNavItem(patterns) {
+    function isDeniedNavItem(patterns, itemName) {
+        // Check main denied features (exact match only for specific items)
         for (const denied of deniedFeatures) {
-            if (matchesSecurityPattern(denied, patterns)) {
-                return true;
+            // For denied features, use exact matching to avoid false positives
+            // e.g., "DriverSafetyScorecard" should only match "Driver Safety Scorecard"
+            const deniedLower = denied.toLowerCase().replace(/\s+/g, '');
+            for (const pattern of patterns) {
+                const patternLower = pattern.toLowerCase();
+                if (deniedLower.includes(patternLower) && deniedLower.includes(patternLower)) {
+                    // Additional check: make sure it's a specific match
+                    if (itemName && denied.toLowerCase().includes(itemName.toLowerCase().replace(/\s+/g, ''))) {
+                        return true;
+                    }
+                }
             }
         }
+
+        // Check video-specific denied features for Video section items
+        if (itemName) {
+            const itemNameClean = itemName.replace(/\s+/g, '');
+            for (const denied of deniedVideoFeatures) {
+                const deniedClean = denied.replace(/\s+/g, '');
+                if (itemNameClean.toLowerCase() === deniedClean.toLowerCase()) {
+                    return true;
+                }
+            }
+        }
+
         return false;
     }
 
@@ -675,7 +727,7 @@ function renderModalContent(clearance, securityFilters) {
     // isNoAccess overrides everything - if true, no access to anything
     // For "except" pattern: full access UNLESS item is in deniedFeatures
     navPreview.innerHTML = navigationStructure.map(navItem => {
-        const isDenied = isDeniedNavItem(navItem.securityIds);
+        const isDenied = isDeniedNavItem(navItem.securityIds, navItem.name);
         const hasAccess = !isNoAccess && !isDenied && (isFullAccess || hasAccessToNavItem(allowedFeatures, navItem.securityIds));
         const accessClass = hasAccess ? 'has-access' : 'no-access';
 
@@ -683,7 +735,7 @@ function renderModalContent(clearance, securityFilters) {
         if (navItem.children.length > 0) {
             childrenHtml = '<ul class="nav-children">' +
                 navItem.children.map(child => {
-                    const childIsDenied = isDeniedNavItem(child.securityIds);
+                    const childIsDenied = isDeniedNavItem(child.securityIds, child.name);
                     const childHasAccess = !isNoAccess && !childIsDenied && (isFullAccess || hasAccessToNavItem(allowedFeatures, child.securityIds));
                     const childClass = childHasAccess ? 'has-access' : 'no-access';
                     return `<li class="${childClass}">
@@ -710,11 +762,11 @@ function renderModalContent(clearance, securityFilters) {
     let accessibleCount = 0;
     navigationStructure.forEach(item => {
         totalFeatures++;
-        const itemDenied = isDeniedNavItem(item.securityIds);
+        const itemDenied = isDeniedNavItem(item.securityIds, item.name);
         if (!isNoAccess && !itemDenied && (isFullAccess || hasAccessToNavItem(allowedFeatures, item.securityIds))) accessibleCount++;
         item.children.forEach(child => {
             totalFeatures++;
-            const childDenied = isDeniedNavItem(child.securityIds);
+            const childDenied = isDeniedNavItem(child.securityIds, child.name);
             if (!isNoAccess && !childDenied && (isFullAccess || hasAccessToNavItem(allowedFeatures, child.securityIds))) accessibleCount++;
         });
     });
