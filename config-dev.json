@@ -1,0 +1,16 @@
+{
+  "name": "Clearance Preview (DEV)",
+  "supportEmail": "support@geotab.com",
+  "items": [
+    {
+      "page": "clearancePreviewDev",
+      "url": "https://sandeepbasra-arch.github.io/clearance-preview/index.html",
+      "path": "addinsLink/",
+      "menuName": {
+        "en": "Clearance Preview (DEV)"
+      }
+    }
+  ],
+  "isSigned": false,
+  "version": "dev"
+}
