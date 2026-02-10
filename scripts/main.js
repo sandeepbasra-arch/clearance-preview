@@ -239,7 +239,7 @@ function fetchClearances() {
         return;
     }
 
-    // Real MyGeotab mode - get security clearances from users, then fetch full details
+    // Real MyGeotab mode - get security clearances from users
     console.log('Fetching security clearances...');
 
     api.call('Get', {
@@ -248,63 +248,41 @@ function fetchClearances() {
     }, function (users) {
         console.log('Total users:', users.length);
 
-        // Collect all unique security group IDs from all users
-        const securityGroupIds = new Set();
+        // Collect all unique security groups from all users
+        const securityGroupMap = new Map();
 
         users.forEach(user => {
             if (user.securityGroups && user.securityGroups.length > 0) {
                 user.securityGroups.forEach(sg => {
-                    if (sg.id) {
-                        securityGroupIds.add(sg.id);
+                    if (sg.id && !securityGroupMap.has(sg.id)) {
+                        // Get name - clean it up
+                        let name = sg.name || sg.id;
+                        name = name.replace(/^\*\*/, '').replace(/\*\*$/, '');
+
+                        // Make built-in security IDs more readable
+                        if (name.startsWith('Group') && name.endsWith('SecurityId')) {
+                            name = name.replace('Group', '').replace('SecurityId', '');
+                            name = name.replace(/([A-Z])/g, ' $1').trim();
+                        }
+
+                        securityGroupMap.set(sg.id, {
+                            id: sg.id,
+                            name: name,
+                            comments: sg.comments || ''
+                        });
                     }
                 });
             }
         });
 
-        console.log('Unique security group IDs:', securityGroupIds.size);
+        clearances = Array.from(securityGroupMap.values());
+        console.log('Security clearances found:', clearances.length);
 
-        // Fetch all groups and filter to our security group IDs
-        const groupIds = Array.from(securityGroupIds);
+        // Sort by name
+        clearances.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
-        api.call('Get', {
-            typeName: 'Group',
-            search: {}
-        }, function (allGroups) {
-            console.log('All groups fetched:', allGroups.length);
-
-            // Filter to just the security groups we found
-            const groups = allGroups.filter(g => groupIds.includes(g.id));
-            console.log('Matched security groups:', groups.length);
-
-            clearances = groups.map(group => {
-                // Clean up name
-                let name = group.name || group.id;
-                name = name.replace(/^\*\*/, '').replace(/\*\*$/, '');
-
-                // Make ID-based names more readable
-                if (name.startsWith('Group') && name.endsWith('SecurityId')) {
-                    name = name.replace('Group', '').replace('SecurityId', '');
-                    name = name.replace(/([A-Z])/g, ' $1').trim();
-                }
-
-                return {
-                    ...group,
-                    name: name
-                };
-            });
-
-            // Sort by name
-            clearances.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-
-            console.log('Clearances:', clearances.map(c => ({ id: c.id, name: c.name })));
-
-            loading.style.display = 'none';
-            renderClearances();
-
-        }, function (error) {
-            console.error('Failed to fetch groups:', error);
-            showError('Failed to load clearances: ' + error.message);
-        });
+        loading.style.display = 'none';
+        renderClearances();
 
     }, function (error) {
         console.error('Failed to load users:', error);
