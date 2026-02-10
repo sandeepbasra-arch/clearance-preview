@@ -342,6 +342,16 @@ body {
     background: linear-gradient(135deg, #ffd700 0%, #ffb300 100%);
 }
 
+.stat-none {
+    background: linear-gradient(135deg, #ff6b6b 0%, #dc3545 100%);
+    color: white;
+}
+
+.stat-none .stat-value,
+.stat-none .stat-label {
+    color: white;
+}
+
 /* Main Content Area */
 .myg-main {
     flex: 1;
@@ -437,6 +447,24 @@ body {
     border-radius: 8px;
     text-align: center;
     font-weight: 500;
+}
+
+.no-access-message {
+    background: #ffebee;
+    color: #c62828;
+    padding: 16px;
+    border-radius: 8px;
+    text-align: center;
+    font-weight: 500;
+}
+
+.no-features {
+    background: #f5f5f5;
+    color: #666;
+    padding: 16px;
+    border-radius: 8px;
+    text-align: center;
+    font-style: italic;
 }
 
 /* Responsive */

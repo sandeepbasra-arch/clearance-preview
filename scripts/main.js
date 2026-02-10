@@ -469,15 +469,16 @@ function openModal(clearance) {
     console.log('Allowed features:', Array.from(allowedFeatures));
 
     // Render navigation preview using pattern-based matching
+    // isNoAccess overrides everything - if true, no access to anything
     navPreview.innerHTML = navigationStructure.map(navItem => {
-        const hasAccess = isFullAccess || hasAccessToNavItem(allowedFeatures, navItem.securityIds);
+        const hasAccess = !isNoAccess && (isFullAccess || hasAccessToNavItem(allowedFeatures, navItem.securityIds));
         const accessClass = hasAccess ? 'has-access' : 'no-access';
 
         let childrenHtml = '';
         if (navItem.children.length > 0) {
             childrenHtml = '<ul class="nav-children">' +
                 navItem.children.map(child => {
-                    const childHasAccess = isFullAccess || hasAccessToNavItem(allowedFeatures, child.securityIds);
+                    const childHasAccess = !isNoAccess && (isFullAccess || hasAccessToNavItem(allowedFeatures, child.securityIds));
                     const childClass = childHasAccess ? 'has-access' : 'no-access';
                     return `<li class="${childClass}">
                         ${child.name}
@@ -498,32 +499,49 @@ function openModal(clearance) {
     }).join('');
 
     // Calculate access stats using pattern-based matching
+    // isNoAccess means 0 access to everything
     let totalFeatures = 0;
     let accessibleCount = 0;
     navigationStructure.forEach(item => {
         totalFeatures++;
-        if (isFullAccess || hasAccessToNavItem(allowedFeatures, item.securityIds)) accessibleCount++;
+        if (!isNoAccess && (isFullAccess || hasAccessToNavItem(allowedFeatures, item.securityIds))) accessibleCount++;
         item.children.forEach(child => {
             totalFeatures++;
-            if (isFullAccess || hasAccessToNavItem(allowedFeatures, child.securityIds)) accessibleCount++;
+            if (!isNoAccess && (isFullAccess || hasAccessToNavItem(allowedFeatures, child.securityIds))) accessibleCount++;
         });
     });
     const accessPercentage = Math.round((accessibleCount / totalFeatures) * 100);
 
     // Render access summary
+    // Determine the access type label and icon
+    let accessIcon, accessLabel, statClass;
+    if (isNoAccess) {
+        accessIcon = '🚫';
+        accessLabel = 'No Access';
+        statClass = 'stat-none';
+    } else if (isFullAccess) {
+        accessIcon = '👑';
+        accessLabel = 'Full Access';
+        statClass = 'stat-full';
+    } else {
+        accessIcon = '🔒';
+        accessLabel = 'Restricted';
+        statClass = '';
+    }
+
     accessSummary.innerHTML = `
         <div class="summary-stats">
             <div class="stat">
-                <span class="stat-value">${isFullAccess ? 'All' : accessibleCount}</span>
+                <span class="stat-value">${isFullAccess ? 'All' : (isNoAccess ? '0' : accessibleCount)}</span>
                 <span class="stat-label">Features Allowed</span>
             </div>
             <div class="stat">
-                <span class="stat-value">${accessPercentage}%</span>
+                <span class="stat-value">${isNoAccess ? '0' : accessPercentage}%</span>
                 <span class="stat-label">Access Level</span>
             </div>
-            <div class="stat ${isFullAccess ? 'stat-full' : ''}">
-                <span class="stat-value">${isFullAccess ? '👑' : '🔒'}</span>
-                <span class="stat-label">${isFullAccess ? 'Full Access' : 'Restricted'}</span>
+            <div class="stat ${statClass}">
+                <span class="stat-value">${accessIcon}</span>
+                <span class="stat-label">${accessLabel}</span>
             </div>
         </div>
         <p class="clearance-name"><strong>Clearance:</strong> ${escapeHtml(clearance.name)}</p>
@@ -531,7 +549,9 @@ function openModal(clearance) {
     `;
 
     // Render feature list
-    if (securityFilters.length > 0) {
+    if (isNoAccess) {
+        featureList.innerHTML = '<p class="no-access-message">🚫 This clearance has no access to any features.</p>';
+    } else if (securityFilters.length > 0) {
         featureList.innerHTML = `
             <div class="feature-grid">
                 ${securityFilters.map(filter => `
@@ -542,8 +562,10 @@ function openModal(clearance) {
                 `).join('')}
             </div>
         `;
-    } else {
+    } else if (isFullAccess) {
         featureList.innerHTML = '<p class="full-access">👑 This clearance has full access to all features.</p>';
+    } else {
+        featureList.innerHTML = '<p class="no-features">No specific security features defined for this clearance.</p>';
     }
 
     modal.classList.add('open');
