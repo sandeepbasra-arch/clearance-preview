@@ -239,56 +239,49 @@ function fetchClearances() {
         return;
     }
 
-    // Real MyGeotab mode - fetch SecurityGroup objects directly
+    // Real MyGeotab mode - fetch SecurityGroup (clearances) directly
     console.log('Fetching security clearances...');
 
+    // SecurityGroup is the correct type for clearances in MyGeotab
     api.call('Get', {
-        typeName: 'Group',
+        typeName: 'SecurityGroup',
         search: {}
-    }, function (allGroups) {
-        console.log('Total groups found:', allGroups.length);
+    }, function (securityGroups) {
+        console.log('SecurityGroup objects found:', securityGroups.length);
+        console.log('SecurityGroups:', securityGroups);
 
-        // Find security clearance groups - they are children of GroupSecurityId
-        // or have "securityFilters" property
-        clearances = allGroups.filter(group => {
-            // Check if parent is GroupSecurityId
-            if (group.parent && group.parent.id === 'GroupSecurityId') {
-                return true;
-            }
-            // Check if it's a security group by looking for security-related IDs
-            if (group.id && group.id.toLowerCase().includes('security')) {
-                return true;
-            }
-            // Check if group has securityFilters (indicates it's a clearance)
-            if (group.securityFilters && group.securityFilters.length > 0) {
-                return true;
-            }
-            return false;
-        });
-
-        console.log('Security clearances found:', clearances.length);
-        console.log('Clearances:', clearances.map(c => ({ id: c.id, name: c.name })));
-
-        if (clearances.length === 0) {
-            // Try alternative: look for groups with specific naming patterns
-            clearances = allGroups.filter(group => {
-                const name = (group.name || '').toLowerCase();
-                return name.includes('administrator') ||
-                       name.includes('supervisor') ||
-                       name.includes('user') ||
-                       name.includes('driver') ||
-                       name.includes('view only') ||
-                       name.includes('clearance');
-            });
-            console.log('Fallback clearances found:', clearances.length);
-        }
-
+        clearances = securityGroups;
         loading.style.display = 'none';
         renderClearances();
 
     }, function (error) {
-        console.error('Failed to load groups:', error);
-        showError('Failed to load clearances: ' + error.message);
+        console.error('SecurityGroup query failed:', error);
+
+        // Fallback: try getting groups and filter
+        api.call('Get', {
+            typeName: 'Group',
+            search: {}
+        }, function (allGroups) {
+            console.log('Fallback - Total groups:', allGroups.length);
+
+            // Look for groups that have securityFilters or specific patterns
+            clearances = allGroups.filter(group => {
+                // Security clearance groups often have these patterns in their ID
+                const id = (group.id || '').toLowerCase();
+                return id.startsWith('groupsecurity') ||
+                       id.includes('clearance') ||
+                       (group.securityFilters && group.securityFilters.length > 0);
+            });
+
+            console.log('Fallback clearances found:', clearances.length);
+            console.log('Clearances:', clearances);
+
+            loading.style.display = 'none';
+            renderClearances();
+
+        }, function (error2) {
+            showError('Failed to load clearances: ' + error2.message);
+        });
     });
 }
 
