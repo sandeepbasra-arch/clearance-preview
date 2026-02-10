@@ -328,6 +328,18 @@ function isFeatureEnabled(allowedFeatures, featureId) {
     return false;
 }
 
+/**
+ * Check if a feature is denied based on denied features
+ */
+function isFeatureDenied(deniedFeatures, featureId) {
+    for (const denied of deniedFeatures) {
+        if (denied.toLowerCase().includes(featureId.toLowerCase())) {
+            return true;
+        }
+    }
+    return false;
+}
+
 // Shared state
 let api = null;
 let state = null;
@@ -549,56 +561,71 @@ function renderModalContent(clearance, securityFilters) {
     const featureList = document.getElementById('feature-list');
 
     const allowedFeatures = new Set();
+    const deniedFeatures = new Set();
 
-    securityFilters.forEach(filter => {
-        // Handle different formats of security filters across databases
-        // Format 1: { securityIdentifier: 'FeatureName' }
+    // Check if this clearance uses "isAdd: false" pattern (inherits from parent, removes specific items)
+    // If ALL filters have isAdd: false, this is an "everything except" clearance
+    const hasAnyAddTrue = securityFilters.some(f => f.isAdd === true);
+    const hasAllAddFalse = securityFilters.length > 0 && securityFilters.every(f => f.isAdd === false);
+    const isExceptPattern = hasAllAddFalse && !hasAnyAddTrue;
+
+    console.log('Security filter pattern: isExceptPattern =', isExceptPattern, '(inherits full access, removes specific items)');
+
+    // Helper to extract feature names from a filter
+    function extractFeatureNames(filter) {
+        const names = new Set();
         if (filter.securityIdentifier) {
-            allowedFeatures.add(filter.securityIdentifier);
+            names.add(filter.securityIdentifier);
         }
-        // Format 2: { securityId: { id: '...', name: '...' } } - use the name property directly!
         if (filter.securityId) {
             if (typeof filter.securityId === 'string') {
-                allowedFeatures.add(filter.securityId);
+                names.add(filter.securityId);
             } else {
-                // The securityId object often contains the name directly!
                 if (filter.securityId.name) {
                     let name = filter.securityId.name;
-                    allowedFeatures.add(name);
-                    // Clean up common patterns
+                    names.add(name);
                     if (name.startsWith('SecurityId') && name.endsWith('Id')) {
-                        const cleanName = name.replace(/^SecurityId/, '').replace(/Id$/, '');
-                        allowedFeatures.add(cleanName);
+                        names.add(name.replace(/^SecurityId/, '').replace(/Id$/, ''));
                     }
                 }
-
-                // Also handle the id for pattern matching
                 if (filter.securityId.id) {
                     const id = filter.securityId.id;
-                    allowedFeatures.add(id);
-
-                    // Extract feature name from ID patterns
+                    names.add(id);
                     if (id.startsWith('SecurityId') && id.endsWith('Id')) {
-                        const cleanId = id.replace(/^SecurityId/, '').replace(/Id$/, '');
-                        allowedFeatures.add(cleanId);
+                        names.add(id.replace(/^SecurityId/, '').replace(/Id$/, ''));
                     } else if (id.startsWith('Group') && id.endsWith('SecurityId')) {
-                        const cleanId = id.replace(/^Group/, '').replace(/SecurityId$/, '');
-                        allowedFeatures.add(cleanId);
+                        names.add(id.replace(/^Group/, '').replace(/SecurityId$/, ''));
                     }
                 }
             }
         }
+        return names;
+    }
+
+    securityFilters.forEach(filter => {
+        const featureNames = extractFeatureNames(filter);
+        if (filter.isAdd === false) {
+            // This permission is being DENIED/REMOVED
+            featureNames.forEach(name => deniedFeatures.add(name));
+        } else {
+            // This permission is being GRANTED
+            featureNames.forEach(name => allowedFeatures.add(name));
+        }
     });
 
-    console.log('Allowed features after resolution:', Array.from(allowedFeatures));
+    console.log('Allowed features:', Array.from(allowedFeatures));
+    console.log('Denied features:', Array.from(deniedFeatures));
 
     // Determine access level
     // GroupEverythingSecurityId or "Everything" filter = full access
     // GroupNothingSecurityId = no access
+    // isExceptPattern = inherits full access from parent, with specific denials
     const clearanceIdLower = (clearance.id || '').toLowerCase();
     const clearanceNameLower = (clearance.name || '').toLowerCase();
 
-    const isFullAccess = clearanceIdLower === 'groupeverythingsecurityid' ||
+    // If using "except" pattern (all filters are isAdd:false), this inherits full access with exceptions
+    const isFullAccess = isExceptPattern ||
+                         clearanceIdLower === 'groupeverythingsecurityid' ||
                          clearanceIdLower.includes('everything') ||
                          clearanceNameLower.includes('everything') ||
                          allowedFeatures.has('Everything') ||
@@ -610,21 +637,33 @@ function renderModalContent(clearance, securityFilters) {
                        allowedFeatures.has('Nothing') ||
                        allowedFeatures.has('NothingSecurity');
 
-    console.log('Clearance:', clearance.name, 'isFullAccess:', isFullAccess, 'isNoAccess:', isNoAccess);
-    console.log('Security filters:', securityFilters);
-    console.log('Allowed features:', Array.from(allowedFeatures));
+    console.log('Clearance:', clearance.name, 'isFullAccess:', isFullAccess, 'isNoAccess:', isNoAccess, 'isExceptPattern:', isExceptPattern);
+    console.log('Denied features (exceptions):', Array.from(deniedFeatures));
+
+    // Helper to check if a nav item is explicitly denied
+    function isDeniedNavItem(patterns) {
+        for (const denied of deniedFeatures) {
+            if (matchesSecurityPattern(denied, patterns)) {
+                return true;
+            }
+        }
+        return false;
+    }
 
     // Render navigation preview using pattern-based matching
     // isNoAccess overrides everything - if true, no access to anything
+    // For "except" pattern: full access UNLESS item is in deniedFeatures
     navPreview.innerHTML = navigationStructure.map(navItem => {
-        const hasAccess = !isNoAccess && (isFullAccess || hasAccessToNavItem(allowedFeatures, navItem.securityIds));
+        const isDenied = isDeniedNavItem(navItem.securityIds);
+        const hasAccess = !isNoAccess && !isDenied && (isFullAccess || hasAccessToNavItem(allowedFeatures, navItem.securityIds));
         const accessClass = hasAccess ? 'has-access' : 'no-access';
 
         let childrenHtml = '';
         if (navItem.children.length > 0) {
             childrenHtml = '<ul class="nav-children">' +
                 navItem.children.map(child => {
-                    const childHasAccess = !isNoAccess && (isFullAccess || hasAccessToNavItem(allowedFeatures, child.securityIds));
+                    const childIsDenied = isDeniedNavItem(child.securityIds);
+                    const childHasAccess = !isNoAccess && !childIsDenied && (isFullAccess || hasAccessToNavItem(allowedFeatures, child.securityIds));
                     const childClass = childHasAccess ? 'has-access' : 'no-access';
                     return `<li class="${childClass}">
                         ${child.name}
@@ -645,15 +684,17 @@ function renderModalContent(clearance, securityFilters) {
     }).join('');
 
     // Calculate access stats using pattern-based matching
-    // isNoAccess means 0 access to everything
+    // Account for denied items in "except" pattern
     let totalFeatures = 0;
     let accessibleCount = 0;
     navigationStructure.forEach(item => {
         totalFeatures++;
-        if (!isNoAccess && (isFullAccess || hasAccessToNavItem(allowedFeatures, item.securityIds))) accessibleCount++;
+        const itemDenied = isDeniedNavItem(item.securityIds);
+        if (!isNoAccess && !itemDenied && (isFullAccess || hasAccessToNavItem(allowedFeatures, item.securityIds))) accessibleCount++;
         item.children.forEach(child => {
             totalFeatures++;
-            if (!isNoAccess && (isFullAccess || hasAccessToNavItem(allowedFeatures, child.securityIds))) accessibleCount++;
+            const childDenied = isDeniedNavItem(child.securityIds);
+            if (!isNoAccess && !childDenied && (isFullAccess || hasAccessToNavItem(allowedFeatures, child.securityIds))) accessibleCount++;
         });
     });
     const accessPercentage = Math.round((accessibleCount / totalFeatures) * 100);
@@ -665,6 +706,10 @@ function renderModalContent(clearance, securityFilters) {
         accessIcon = '🚫';
         accessLabel = 'No Access';
         statClass = 'stat-none';
+    } else if (isExceptPattern) {
+        accessIcon = '👑';
+        accessLabel = 'Full (with exceptions)';
+        statClass = 'stat-full';
     } else if (isFullAccess) {
         accessIcon = '👑';
         accessLabel = 'Full Access';
@@ -717,21 +762,31 @@ function renderModalContent(clearance, securityFilters) {
             </div>
         `;
     } else if (isFullAccess) {
-        // Show all features as enabled
+        // Show all features as enabled, except denied ones
         const categories = [...new Set(keySecurityFeatures.map(f => f.category))];
+        const hasDeniedFeatures = deniedFeatures.size > 0;
+        const messageText = hasDeniedFeatures
+            ? '👑 This clearance has full access with specific exceptions (shown in red).'
+            : '👑 This clearance has full access to all features.';
+
         featureList.innerHTML = `
-            <p class="full-access">👑 This clearance has full access to all features.</p>
+            <p class="full-access">${messageText}</p>
             <div class="feature-categories">
                 ${categories.map(category => `
                     <div class="feature-category">
                         <h4>${category}</h4>
                         <div class="feature-grid">
-                            ${keySecurityFeatures.filter(f => f.category === category).map(feature => `
-                                <div class="feature-item allowed">
-                                    <span class="feature-icon">✓</span>
-                                    <span class="feature-name">${feature.name}</span>
-                                </div>
-                            `).join('')}
+                            ${keySecurityFeatures.filter(f => f.category === category).map(feature => {
+                                // Check if this feature is denied
+                                const isDenied = isFeatureDenied(deniedFeatures, feature.id);
+                                const enabled = !isDenied;
+                                return `
+                                    <div class="feature-item ${enabled ? 'allowed' : 'denied'}">
+                                        <span class="feature-icon">${enabled ? '✓' : '✕'}</span>
+                                        <span class="feature-name">${feature.name}</span>
+                                    </div>
+                                `;
+                            }).join('')}
                         </div>
                     </div>
                 `).join('')}
