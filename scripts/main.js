@@ -644,22 +644,31 @@ window.showPreview = function (clearanceId) {
         return;
     }
 
-    // Real mode - fetch full group details including securityFilters
+    // Real mode - fetch full group details including securityFilters and parent
     console.log('Fetching details for clearance:', clearanceId);
 
     api.call('Get', {
         typeName: 'Group',
         search: { id: clearanceId },
         propertySelector: {
-            fields: ['id', 'name', 'comments', 'securityFilters', 'children']
+            fields: ['id', 'name', 'comments', 'securityFilters', 'children', 'parent']
         }
     }, function (result) {
         if (result && result.length > 0) {
             const fullClearance = result[0];
             console.log('Full clearance data:', fullClearance);
+            console.log('Parent clearance:', fullClearance.parent);
 
             // Clean up name
             fullClearance.name = (fullClearance.name || clearanceId).replace(/^\*\*/, '').replace(/\*\*$/, '');
+
+            // Check if parent is a full-access clearance
+            const parentId = fullClearance.parent?.id || '';
+            const inheritsFullAccess = parentId === 'GroupEverythingSecurityId' ||
+                                       parentId === 'GroupSupervisorSecurityId' ||
+                                       parentId.includes('Everything');
+            fullClearance.inheritsFullAccess = inheritsFullAccess;
+            console.log('Inherits full access from parent:', inheritsFullAccess, '(parent:', parentId, ')');
 
             openModal(fullClearance);
         } else {
@@ -770,12 +779,12 @@ function renderModalContent(clearance, securityFilters) {
 
     console.log(`isAdd counts: true=${addTrueCount}, false=${addFalseCount}, other=${addOtherCount}`);
 
-    // The securityFilters only contains OVERRIDES, not the full permission list.
-    // We cannot determine "full access with exceptions" from this data alone.
-    // Only built-in clearances (GroupEverythingSecurityId) should be treated as full access.
-    // For custom clearances, we can only show what's explicitly granted (isAdd: true).
-    const actualExceptPattern = false; // Disabled - we don't have full permission data
-    console.log('Filter counts:', `${addTrueCount} grants (isAdd:true), ${addFalseCount} denials (isAdd:false)`);
+    // Check if this clearance inherits from a full-access parent
+    // If so, use exception pattern: full access minus isAdd:false items
+    const inheritsFullAccess = clearance.inheritsFullAccess || false;
+    const actualExceptPattern = inheritsFullAccess && addFalseCount > 0;
+    console.log('Filter counts:', `${addTrueCount} grants, ${addFalseCount} denials`);
+    console.log('Inherits full access:', inheritsFullAccess, '-> Exception pattern:', actualExceptPattern);
 
     securityFilters.forEach((filter, index) => {
         const featureNames = extractFeatureNames(filter);
