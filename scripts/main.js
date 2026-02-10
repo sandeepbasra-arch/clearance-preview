@@ -911,15 +911,27 @@ function renderModalContent(clearance, securityFilters) {
                 }
             }
 
-            // For exception pattern, add to denied features (these are being removed from full access)
-            if (actualExceptPattern) {
-                // Parse the permission name and add to denied
-                const permName = filter.securityIdentifier || filter.securityId?.name || '';
-                const parsed = parsePermissionName(permName);
-                if (parsed) {
-                    deniedFeatures.add(parsed);
-                }
+            // For ANY clearance with denials, remove from allowed and add to denied
+            // This handles both exception pattern AND inherited permissions
+            const permName = filter.securityIdentifier || filter.securityId?.name || '';
+            const parsed = parsePermissionName(permName);
+            if (parsed) {
+                deniedFeatures.add(parsed);
+                // Also remove the raw and parsed versions from allowed
+                allowedFeatures.delete(permName);
+                allowedFeatures.delete(parsed);
+                // Try common variations
+                allowedFeatures.delete('SecurityId' + parsed + 'Id');
             }
+            // Remove all extracted feature names from allowed
+            featureNames.forEach(name => {
+                allowedFeatures.delete(name);
+                const parsedName = parsePermissionName(name);
+                if (parsedName) {
+                    allowedFeatures.delete(parsedName);
+                    deniedFeatures.add(parsedName);
+                }
+            });
         }
     });
 
