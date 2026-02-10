@@ -263,17 +263,18 @@ function fetchClearances() {
 
         console.log('Unique security group IDs:', securityGroupIds.size);
 
-        // Now fetch full details for each security group
+        // Fetch all groups and filter to our security group IDs
         const groupIds = Array.from(securityGroupIds);
 
-        // Batch fetch all groups at once
         api.call('Get', {
             typeName: 'Group',
-            search: {
-                id: groupIds
-            }
-        }, function (groups) {
-            console.log('Full group details fetched:', groups.length);
+            search: {}
+        }, function (allGroups) {
+            console.log('All groups fetched:', allGroups.length);
+
+            // Filter to just the security groups we found
+            const groups = allGroups.filter(g => groupIds.includes(g.id));
+            console.log('Matched security groups:', groups.length);
 
             clearances = groups.map(group => {
                 // Clean up name
@@ -301,8 +302,8 @@ function fetchClearances() {
             renderClearances();
 
         }, function (error) {
-            console.error('Failed to fetch group details:', error);
-            showError('Failed to load clearance details: ' + error.message);
+            console.error('Failed to fetch groups:', error);
+            showError('Failed to load clearances: ' + error.message);
         });
 
     }, function (error) {
