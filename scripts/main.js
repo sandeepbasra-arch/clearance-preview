@@ -537,10 +537,29 @@ function openModal(clearance) {
     const allowedFeatures = new Set();
 
     securityFilters.forEach(filter => {
+        // Handle different formats of security filters across databases
+        // Format 1: { securityIdentifier: 'FeatureName' }
         if (filter.securityIdentifier) {
             allowedFeatures.add(filter.securityIdentifier);
         }
+        // Format 2: { securityId: { id: 'GroupXxxSecurityId' } } - extract from securityId object
+        if (filter.securityId) {
+            if (typeof filter.securityId === 'string') {
+                allowedFeatures.add(filter.securityId);
+            } else if (filter.securityId.id) {
+                // The id often looks like 'GroupViewDeviceDataSecurityId' - extract the feature name
+                let id = filter.securityId.id;
+                allowedFeatures.add(id);
+                // Also add a cleaned version without Group/SecurityId prefix/suffix for pattern matching
+                if (id.startsWith('Group') && id.endsWith('SecurityId')) {
+                    const cleanId = id.replace(/^Group/, '').replace(/SecurityId$/, '');
+                    allowedFeatures.add(cleanId);
+                }
+            }
+        }
     });
+
+    console.log('Extracted security identifiers:', Array.from(allowedFeatures));
 
     // Determine access level
     // GroupEverythingSecurityId or "Everything" filter = full access
