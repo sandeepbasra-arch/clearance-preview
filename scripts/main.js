@@ -644,31 +644,51 @@ window.showPreview = function (clearanceId) {
         return;
     }
 
-    // Real mode - fetch full group details including securityFilters and parent
+    // Real mode - fetch full group details including securityFilters
+    // Also fetch GroupEverythingSecurityId to check if this clearance is a child of it
     console.log('Fetching details for clearance:', clearanceId);
 
-    api.call('Get', {
-        typeName: 'Group',
-        search: { id: clearanceId },
-        propertySelector: {
-            fields: ['id', 'name', 'comments', 'securityFilters', 'children', 'parent']
-        }
-    }, function (result) {
-        if (result && result.length > 0) {
-            const fullClearance = result[0];
+    // Make two calls: one for the clearance, one for the Everything group to check children
+    api.multiCall([
+        ['Get', {
+            typeName: 'Group',
+            search: { id: clearanceId }
+        }],
+        ['Get', {
+            typeName: 'Group',
+            search: { id: 'GroupEverythingSecurityId' }
+        }],
+        ['Get', {
+            typeName: 'Group',
+            search: { id: 'GroupSupervisorSecurityId' }
+        }]
+    ], function (results) {
+        const clearanceResult = results[0];
+        const everythingGroup = results[1]?.[0];
+        const supervisorGroup = results[2]?.[0];
+
+        if (clearanceResult && clearanceResult.length > 0) {
+            const fullClearance = clearanceResult[0];
             console.log('Full clearance data:', fullClearance);
-            console.log('Parent clearance:', fullClearance.parent);
 
             // Clean up name
             fullClearance.name = (fullClearance.name || clearanceId).replace(/^\*\*/, '').replace(/\*\*$/, '');
 
-            // Check if parent is a full-access clearance
-            const parentId = fullClearance.parent?.id || '';
-            const inheritsFullAccess = parentId === 'GroupEverythingSecurityId' ||
-                                       parentId === 'GroupSupervisorSecurityId' ||
-                                       parentId.includes('Everything');
+            // Check if this clearance is a direct child of Everything or Supervisor
+            const everythingChildren = everythingGroup?.children || [];
+            const supervisorChildren = supervisorGroup?.children || [];
+
+            const isChildOfEverything = everythingChildren.some(c => c.id === clearanceId);
+            const isChildOfSupervisor = supervisorChildren.some(c => c.id === clearanceId);
+
+            const inheritsFullAccess = isChildOfEverything || isChildOfSupervisor;
             fullClearance.inheritsFullAccess = inheritsFullAccess;
-            console.log('Inherits full access from parent:', inheritsFullAccess, '(parent:', parentId, ')');
+
+            console.log('Everything children:', everythingChildren.map(c => c.id));
+            console.log('Supervisor children:', supervisorChildren.map(c => c.id));
+            console.log('Is child of Everything:', isChildOfEverything);
+            console.log('Is child of Supervisor:', isChildOfSupervisor);
+            console.log('Inherits full access:', inheritsFullAccess);
 
             openModal(fullClearance);
         } else {
