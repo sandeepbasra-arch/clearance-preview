@@ -689,30 +689,23 @@ function renderModalContent(clearance, securityFilters) {
 
     // Helper to check if a nav item is explicitly denied
     function isDeniedNavItem(patterns, itemName) {
-        // Check main denied features (exact match only for specific items)
+        if (!itemName) return false;
+
+        const itemNameLower = itemName.toLowerCase().replace(/\s+/g, '');
+
+        // Check main denied features - exact name match only
         for (const denied of deniedFeatures) {
-            // For denied features, use exact matching to avoid false positives
-            // e.g., "DriverSafetyScorecard" should only match "Driver Safety Scorecard"
             const deniedLower = denied.toLowerCase().replace(/\s+/g, '');
-            for (const pattern of patterns) {
-                const patternLower = pattern.toLowerCase();
-                if (deniedLower.includes(patternLower) && deniedLower.includes(patternLower)) {
-                    // Additional check: make sure it's a specific match
-                    if (itemName && denied.toLowerCase().includes(itemName.toLowerCase().replace(/\s+/g, ''))) {
-                        return true;
-                    }
-                }
+            if (itemNameLower === deniedLower) {
+                return true;
             }
         }
 
-        // Check video-specific denied features for Video section items
-        if (itemName) {
-            const itemNameClean = itemName.replace(/\s+/g, '');
-            for (const denied of deniedVideoFeatures) {
-                const deniedClean = denied.replace(/\s+/g, '');
-                if (itemNameClean.toLowerCase() === deniedClean.toLowerCase()) {
-                    return true;
-                }
+        // Check video-specific denied features - exact name match only
+        for (const denied of deniedVideoFeatures) {
+            const deniedLower = denied.toLowerCase().replace(/\s+/g, '');
+            if (itemNameLower === deniedLower) {
+                return true;
             }
         }
 
@@ -846,8 +839,29 @@ function renderModalContent(clearance, securityFilters) {
                         <h4>${category}</h4>
                         <div class="feature-grid">
                             ${keySecurityFeatures.filter(f => f.category === category).map(feature => {
-                                // Check if this feature is denied
-                                const isDenied = isFeatureDenied(deniedFeatures, feature.id);
+                                // Check if this feature is denied - use exact name matching
+                                // For Video category, also check deniedVideoFeatures
+                                let isDenied = false;
+                                const featureNameLower = feature.name.toLowerCase().replace(/\s+/g, '');
+
+                                for (const denied of deniedFeatures) {
+                                    if (denied.toLowerCase().replace(/\s+/g, '') === featureNameLower) {
+                                        isDenied = true;
+                                        break;
+                                    }
+                                }
+
+                                // Also check video-specific denials for Video category
+                                if (!isDenied && category === 'Video') {
+                                    for (const denied of deniedVideoFeatures) {
+                                        // Match "Live Video" to feature name
+                                        if (denied.toLowerCase().replace(/\s+/g, '') === featureNameLower) {
+                                            isDenied = true;
+                                            break;
+                                        }
+                                    }
+                                }
+
                                 const enabled = !isDenied;
                                 return `
                                     <div class="feature-item ${enabled ? 'allowed' : 'denied'}">
