@@ -138,6 +138,17 @@ const navigationStructure = [
         ]
     },
     {
+        name: 'Video',
+        icon: '🎥',
+        securityIds: ['Video', 'Camera', 'Media', 'Footage'],
+        children: [
+            { name: 'Video Events', securityIds: ['Video', 'Event'] },
+            { name: 'Live Video', securityIds: ['Video', 'Live', 'Stream'] },
+            { name: 'Video Requests', securityIds: ['Video', 'Request'] },
+            { name: 'Camera Health', securityIds: ['Camera', 'Health'] }
+        ]
+    },
+    {
         name: 'Compliance',
         icon: '✅',
         securityIds: ['HOS', 'DVIR', 'Tachograph', 'Compliance', 'FuelTax', 'IFTA'],
@@ -194,6 +205,17 @@ const navigationStructure = [
             { name: 'Rules', securityIds: ['Rule'] },
             { name: 'Groups', securityIds: ['Group'] },
             { name: 'Exception Rules', securityIds: ['Exception', 'Rule'] }
+        ]
+    },
+    {
+        name: 'Reports',
+        icon: '📄',
+        securityIds: ['Report', 'Export', 'Download', 'Schedule'],
+        children: [
+            { name: 'Report Builder', securityIds: ['Report', 'Builder', 'Custom'] },
+            { name: 'Scheduled Reports', securityIds: ['Report', 'Schedule'] },
+            { name: 'Excel Reports', securityIds: ['Report', 'Excel', 'Export'] },
+            { name: 'Dashboard Reports', securityIds: ['Report', 'Dashboard'] }
         ]
     },
     {
@@ -254,6 +276,11 @@ const keySecurityFeatures = [
     { id: 'Risk', name: 'Risk Management', category: 'Safety' },
     { id: 'Collision', name: 'Collision Detection', category: 'Safety' },
 
+    // Video
+    { id: 'Video', name: 'Video Access', category: 'Video' },
+    { id: 'Camera', name: 'Camera Management', category: 'Video' },
+    { id: 'Media', name: 'Media Files', category: 'Video' },
+
     // Compliance
     { id: 'HOS', name: 'Hours of Service', category: 'Compliance' },
     { id: 'DVIR', name: 'DVIR Logs', category: 'Compliance' },
@@ -273,6 +300,11 @@ const keySecurityFeatures = [
     { id: 'Sustainability', name: 'Sustainability', category: 'Sustainability' },
     { id: 'Emission', name: 'Emissions', category: 'Sustainability' },
     { id: 'Idling', name: 'Idling Reports', category: 'Sustainability' },
+
+    // Reports
+    { id: 'Report', name: 'Reports', category: 'Reports' },
+    { id: 'Export', name: 'Data Export', category: 'Reports' },
+    { id: 'Schedule', name: 'Scheduled Reports', category: 'Reports' },
 
     // Administration
     { id: 'User', name: 'User Management', category: 'Admin' },
