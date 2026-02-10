@@ -551,13 +551,17 @@ function openModal(clearance) {
         // Some databases use SecurityIdentifier type, others use Group
         const calls = securityIdRefs.map(id => ['Get', { typeName: 'SecurityIdentifier', search: { id: id } }]);
 
-        // Try to resolve IDs via Group lookup (SecurityIdentifier type may not exist)
+        // Try to resolve IDs via Group lookup
         const groupCalls = securityIdRefs.map(id => ['Get', { typeName: 'Group', search: { id: id } }]);
 
+        console.log('Making Group lookup calls for:', securityIdRefs);
+
         api.multiCall(groupCalls, function(results) {
+            console.log('Group lookup raw results:', results);
             const resolvedNames = new Map();
 
             results.forEach((result, index) => {
+                console.log(`Result for ${securityIdRefs[index]}:`, result);
                 if (result && result.length > 0) {
                     const group = result[0];
                     let name = group.name || '';
@@ -567,9 +571,12 @@ function openModal(clearance) {
                         resolvedNames.set(securityIdRefs[index], name);
                         console.log(`Resolved Group ${securityIdRefs[index]} -> ${name}`);
                     }
+                } else {
+                    console.log(`No result found for ${securityIdRefs[index]}`);
                 }
             });
 
+            console.log('Resolved names map:', Object.fromEntries(resolvedNames));
             // Render with whatever we resolved - pattern extraction happens in renderModalContent
             renderModalContent(clearance, securityFilters, resolvedNames);
         }, function(error) {
