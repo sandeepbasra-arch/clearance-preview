@@ -771,9 +771,10 @@ function renderModalContent(clearance, securityFilters) {
     console.log(`isAdd counts: true=${addTrueCount}, false=${addFalseCount}, other=${addOtherCount}`);
 
     // Determine the pattern based on actual counts
-    // If ALL or MOST filters have isAdd: false, treat as exception pattern (full access minus denials)
-    const actualExceptPattern = addFalseCount > 0 && addTrueCount === 0;
-    console.log('Actual except pattern (all isAdd:false, no isAdd:true):', actualExceptPattern);
+    // If MOST filters have isAdd: false (denials), treat as exception pattern (full access minus denials)
+    // Allow for 1-2 isAdd:true filters which are usually meta permissions like ViewSecurityId
+    const actualExceptPattern = addFalseCount > 0 && addFalseCount > addTrueCount * 5;
+    console.log('Actual except pattern (mostly isAdd:false):', actualExceptPattern, `(${addFalseCount} denials vs ${addTrueCount} additions)`);
 
     securityFilters.forEach((filter, index) => {
         const featureNames = extractFeatureNames(filter);
