@@ -645,27 +645,28 @@ window.showPreview = function (clearanceId) {
     }
 
     // Real mode - fetch full group details including securityFilters
-    // Also fetch GroupEverythingSecurityId to check if this clearance is a child of it
+    // Also fetch the parent groups to understand inheritance
     console.log('Fetching details for clearance:', clearanceId);
 
-    // Make two calls: one for the clearance, one for the Everything group to check children
+    // Fetch the clearance and all built-in security groups
     api.multiCall([
-        ['Get', {
-            typeName: 'Group',
-            search: { id: clearanceId }
-        }],
-        ['Get', {
-            typeName: 'Group',
-            search: { id: 'GroupEverythingSecurityId' }
-        }],
-        ['Get', {
-            typeName: 'Group',
-            search: { id: 'GroupSupervisorSecurityId' }
-        }]
+        ['Get', { typeName: 'Group', search: { id: clearanceId } }],
+        ['Get', { typeName: 'Group', search: { id: 'GroupEverythingSecurityId' } }],
+        ['Get', { typeName: 'Group', search: { id: 'GroupSupervisorSecurityId' } }],
+        ['Get', { typeName: 'Group', search: { id: 'GroupDriveUserSecurityId' } }],
+        ['Get', { typeName: 'Group', search: { id: 'GroupUserSecurityId' } }],
+        ['Get', { typeName: 'Group', search: { id: 'GroupViewOnlySecurityId' } }],
+        ['Get', { typeName: 'Group', search: { id: 'GroupNothingSecurityId' } }]
     ], function (results) {
         const clearanceResult = results[0];
-        const everythingGroup = results[1]?.[0];
-        const supervisorGroup = results[2]?.[0];
+        const builtInGroups = {
+            'GroupEverythingSecurityId': { group: results[1]?.[0], level: 'full' },
+            'GroupSupervisorSecurityId': { group: results[2]?.[0], level: 'supervisor' },
+            'GroupDriveUserSecurityId': { group: results[3]?.[0], level: 'drive' },
+            'GroupUserSecurityId': { group: results[4]?.[0], level: 'user' },
+            'GroupViewOnlySecurityId': { group: results[5]?.[0], level: 'viewonly' },
+            'GroupNothingSecurityId': { group: results[6]?.[0], level: 'nothing' }
+        };
 
         if (clearanceResult && clearanceResult.length > 0) {
             const fullClearance = clearanceResult[0];
@@ -674,21 +675,63 @@ window.showPreview = function (clearanceId) {
             // Clean up name
             fullClearance.name = (fullClearance.name || clearanceId).replace(/^\*\*/, '').replace(/\*\*$/, '');
 
-            // Check if this clearance is a direct child of Everything or Supervisor
-            const everythingChildren = everythingGroup?.children || [];
-            const supervisorChildren = supervisorGroup?.children || [];
+            // Find which built-in group this clearance is a child/grandchild of
+            function findParentLevel(targetId) {
+                for (const [builtInId, info] of Object.entries(builtInGroups)) {
+                    if (!info.group) continue;
 
-            const isChildOfEverything = everythingChildren.some(c => c.id === clearanceId);
-            const isChildOfSupervisor = supervisorChildren.some(c => c.id === clearanceId);
+                    // Check direct children
+                    const children = info.group.children || [];
+                    for (const child of children) {
+                        if (child.id === targetId) {
+                            console.log(`Found ${targetId} as direct child of ${builtInId}`);
+                            return { parentId: builtInId, level: info.level, depth: 1 };
+                        }
+                    }
+                }
 
-            const inheritsFullAccess = isChildOfEverything || isChildOfSupervisor;
-            fullClearance.inheritsFullAccess = inheritsFullAccess;
+                // Check grandchildren (depth 2)
+                for (const [builtInId, info] of Object.entries(builtInGroups)) {
+                    if (!info.group) continue;
 
-            console.log('Everything children:', everythingChildren.map(c => c.id));
-            console.log('Supervisor children:', supervisorChildren.map(c => c.id));
-            console.log('Is child of Everything:', isChildOfEverything);
-            console.log('Is child of Supervisor:', isChildOfSupervisor);
-            console.log('Inherits full access:', inheritsFullAccess);
+                    const children = info.group.children || [];
+                    for (const child of children) {
+                        // Fetch this child's children by checking if it's in another result
+                        // For now, check if it's a custom clearance that might have children
+                        if (child.children) {
+                            for (const grandchild of child.children) {
+                                if (grandchild.id === targetId) {
+                                    console.log(`Found ${targetId} as grandchild of ${builtInId}`);
+                                    return { parentId: builtInId, level: info.level, depth: 2 };
+                                }
+                            }
+                        }
+                    }
+                }
+
+                return null;
+            }
+
+            const parentInfo = findParentLevel(clearanceId);
+            console.log('Parent info:', parentInfo);
+
+            // Determine access level based on parent
+            if (parentInfo) {
+                fullClearance.parentLevel = parentInfo.level;
+                fullClearance.inheritsFullAccess = parentInfo.level === 'full' || parentInfo.level === 'supervisor';
+            } else {
+                // If we can't find the parent, check if it's a built-in group itself
+                if (builtInGroups[clearanceId]) {
+                    fullClearance.parentLevel = builtInGroups[clearanceId].level;
+                    fullClearance.inheritsFullAccess = fullClearance.parentLevel === 'full' || fullClearance.parentLevel === 'supervisor';
+                } else {
+                    fullClearance.parentLevel = 'unknown';
+                    fullClearance.inheritsFullAccess = false;
+                }
+            }
+
+            console.log('Parent level:', fullClearance.parentLevel);
+            console.log('Inherits full access:', fullClearance.inheritsFullAccess);
 
             openModal(fullClearance);
         } else {
@@ -802,8 +845,15 @@ function renderModalContent(clearance, securityFilters) {
     // Check if this clearance inherits from a full-access parent
     // If so, use exception pattern: full access minus isAdd:false items
     const inheritsFullAccess = clearance.inheritsFullAccess || false;
+    const parentLevel = clearance.parentLevel || 'unknown';
+
+    // For full/supervisor: exception pattern (full access minus denials)
+    // For drive/user/viewonly: additive pattern (only isAdd:true items)
+    // For nothing: no access
     const actualExceptPattern = inheritsFullAccess && addFalseCount > 0;
+
     console.log('Filter counts:', `${addTrueCount} grants, ${addFalseCount} denials`);
+    console.log('Parent level:', parentLevel);
     console.log('Inherits full access:', inheritsFullAccess, '-> Exception pattern:', actualExceptPattern);
 
     securityFilters.forEach((filter, index) => {
