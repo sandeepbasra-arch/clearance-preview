@@ -65,3 +65,4 @@ Edit the `navigationStructure` array in `scripts/main.js` to add more menu items
 - `icon`: Emoji or icon
 - `securityId`: The MyGeotab SecurityIdentifier it maps to
 - `children`: Sub-menu items (optional)
+
