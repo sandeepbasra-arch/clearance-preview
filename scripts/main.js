@@ -333,54 +333,6 @@ let api = null;
 let state = null;
 let clearances = [];
 let securityIdentifiers = [];
-let securityIdMap = new Map(); // Maps security IDs to their names
-
-/**
- * Build a map of all security identifiers by fetching the security group tree
- */
-function buildSecurityIdMap(callback) {
-    if (isStandalone || securityIdMap.size > 0) {
-        callback();
-        return;
-    }
-
-    console.log('Building security ID map...');
-
-    // Fetch all security identifier groups - try GroupEverythingSecurityId for full permission list
-    api.call('Get', {
-        typeName: 'Group',
-        search: {
-            id: 'GroupEverythingSecurityId',
-            includeGroups: true
-        }
-    }, function(result) {
-        if (result && result.length > 0) {
-            // Recursively extract all security IDs from the tree
-            function extractIds(groups) {
-                groups.forEach(group => {
-                    if (group.id && group.name) {
-                        let name = group.name.replace(/^\*\*/, '').replace(/\*\*$/, '');
-                        securityIdMap.set(group.id, name);
-                        // Also map the name variants
-                        if (name.endsWith('Security')) {
-                            securityIdMap.set(group.id, name.replace(/Security$/, ''));
-                        }
-                    }
-                    if (group.children && group.children.length > 0) {
-                        extractIds(group.children);
-                    }
-                });
-            }
-            extractIds(result);
-            console.log('Security ID map built with', securityIdMap.size, 'entries');
-            console.log('Security ID map:', Object.fromEntries(securityIdMap));
-        }
-        callback();
-    }, function(error) {
-        console.warn('Could not build security ID map:', error);
-        callback();
-    });
-}
 
 /**
  * Fetch clearances - uses mock data in standalone mode
@@ -583,69 +535,14 @@ function openModal(clearance) {
     // Get security filters for this clearance
     const securityFilters = clearance.securityFilters || [];
 
-    // Log full security filter structure for debugging
-    console.log('Raw security filters:', JSON.stringify(securityFilters, null, 2));
-
-    // Collect securityId references that need to be resolved
-    const securityIdRefs = [];
-    securityFilters.forEach((filter, idx) => {
-        console.log(`Filter ${idx}:`, filter);
-        if (filter.securityId && filter.securityId.id) {
-            securityIdRefs.push(filter.securityId.id);
-        }
-    });
-
-    // If there are securityId references, resolve them first
-    if (securityIdRefs.length > 0 && !isStandalone && api) {
-        console.log('Resolving security ID references:', securityIdRefs);
-
-        // Try to fetch as SecurityIdentifier objects first, then fall back to Group
-        // Some databases use SecurityIdentifier type, others use Group
-        const calls = securityIdRefs.map(id => ['Get', { typeName: 'SecurityIdentifier', search: { id: id } }]);
-
-        // Try to resolve IDs via Group lookup
-        const groupCalls = securityIdRefs.map(id => ['Get', { typeName: 'Group', search: { id: id } }]);
-
-        console.log('Making Group lookup calls for:', securityIdRefs);
-
-        api.multiCall(groupCalls, function(results) {
-            console.log('Group lookup raw results:', results);
-            const resolvedNames = new Map();
-
-            results.forEach((result, index) => {
-                console.log(`Result for ${securityIdRefs[index]}:`, result);
-                if (result && result.length > 0) {
-                    const group = result[0];
-                    let name = group.name || '';
-                    // Clean up the name - remove ** markers
-                    name = name.replace(/^\*\*/, '').replace(/\*\*$/, '');
-                    if (name) {
-                        resolvedNames.set(securityIdRefs[index], name);
-                        console.log(`Resolved Group ${securityIdRefs[index]} -> ${name}`);
-                    }
-                } else {
-                    console.log(`No result found for ${securityIdRefs[index]}`);
-                }
-            });
-
-            console.log('Resolved names map:', Object.fromEntries(resolvedNames));
-            // Render with whatever we resolved - pattern extraction happens in renderModalContent
-            renderModalContent(clearance, securityFilters, resolvedNames);
-        }, function(error) {
-            console.warn('Could not resolve security IDs via API, using pattern extraction:', error);
-            // Proceed with pattern extraction only (happens in renderModalContent)
-            renderModalContent(clearance, securityFilters, new Map());
-        });
-    } else {
-        // No security ID references to resolve, or in standalone mode
-        renderModalContent(clearance, securityFilters, new Map());
-    }
+    // Render the modal - securityId.name contains permission names directly
+    renderModalContent(clearance, securityFilters);
 }
 
 /**
- * Render the modal content after resolving security IDs
+ * Render the modal content with security filter data
  */
-function renderModalContent(clearance, securityFilters, resolvedNames) {
+function renderModalContent(clearance, securityFilters) {
     const modal = document.getElementById('preview-modal');
     const navPreview = document.getElementById('nav-preview');
     const accessSummary = document.getElementById('access-summary');
@@ -673,7 +570,6 @@ function renderModalContent(clearance, securityFilters, resolvedNames) {
                         const cleanName = name.replace(/^SecurityId/, '').replace(/Id$/, '');
                         allowedFeatures.add(cleanName);
                     }
-                    console.log(`Using securityId.name: ${name}`);
                 }
 
                 // Also handle the id for pattern matching
@@ -955,10 +851,7 @@ if (isStandalone) {
                 console.log('Clearance Preview: focus() called');
                 api = freshApi;
                 state = freshState;
-                // Build security ID map first, then fetch clearances
-                buildSecurityIdMap(function() {
-                    fetchClearances();
-                });
+                fetchClearances();
             },
 
             blur: function () {
