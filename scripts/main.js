@@ -1012,9 +1012,14 @@ function renderModalContent(clearance, securityFilters) {
 
     // Render navigation preview using pattern-based matching
     // isNoAccess overrides everything - if true, no access to anything
-    // For "except" pattern: full access UNLESS item is in deniedFeatures
+    // For exception pattern (full access with denials): check if item is specifically denied
+    // For additive pattern (inherited permissions): only check if any permission grants access
+    // NOTE: Denials only block nav items in exception pattern (inherits full access)
+    //       For non-full-access inheritance, we rely on allowedFeatures which already has denials removed
     navPreview.innerHTML = navigationStructure.map(navItem => {
-        const isDenied = isDeniedNavItem(navItem.securityIds, navItem.name);
+        // Only use denial check for full-access clearances with exceptions
+        const checkDenials = actualExceptPattern || inheritsFullAccess;
+        const isDenied = checkDenials && isDeniedNavItem(navItem.securityIds, navItem.name);
         const hasAccess = !isNoAccess && !isDenied && (isFullAccess || hasAccessToNavItem(allowedFeatures, navItem.securityIds));
         const accessClass = hasAccess ? 'has-access' : 'no-access';
 
@@ -1022,7 +1027,7 @@ function renderModalContent(clearance, securityFilters) {
         if (navItem.children.length > 0) {
             childrenHtml = '<ul class="nav-children">' +
                 navItem.children.map(child => {
-                    const childIsDenied = isDeniedNavItem(child.securityIds, child.name);
+                    const childIsDenied = checkDenials && isDeniedNavItem(child.securityIds, child.name);
                     const childHasAccess = !isNoAccess && !childIsDenied && (isFullAccess || hasAccessToNavItem(allowedFeatures, child.securityIds));
                     const childClass = childHasAccess ? 'has-access' : 'no-access';
                     return `<li class="${childClass}">
@@ -1044,16 +1049,17 @@ function renderModalContent(clearance, securityFilters) {
     }).join('');
 
     // Calculate access stats using pattern-based matching
-    // Account for denied items in "except" pattern
+    // Only account for denied items in "except" pattern (full access with exceptions)
+    const checkDenialsForStats = actualExceptPattern || inheritsFullAccess;
     let totalFeatures = 0;
     let accessibleCount = 0;
     navigationStructure.forEach(item => {
         totalFeatures++;
-        const itemDenied = isDeniedNavItem(item.securityIds, item.name);
+        const itemDenied = checkDenialsForStats && isDeniedNavItem(item.securityIds, item.name);
         if (!isNoAccess && !itemDenied && (isFullAccess || hasAccessToNavItem(allowedFeatures, item.securityIds))) accessibleCount++;
         item.children.forEach(child => {
             totalFeatures++;
-            const childDenied = isDeniedNavItem(child.securityIds, child.name);
+            const childDenied = checkDenialsForStats && isDeniedNavItem(child.securityIds, child.name);
             if (!isNoAccess && !childDenied && (isFullAccess || hasAccessToNavItem(allowedFeatures, child.securityIds))) accessibleCount++;
         });
     });
