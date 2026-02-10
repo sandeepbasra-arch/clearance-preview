@@ -265,7 +265,7 @@ body {
     overflow: auto;
 }
 
-/* MyGeotab Preview Layout */
+/* MyGeotab Preview Layout - Light Sidebar Style */
 .myg-preview {
     display: flex;
     min-height: 600px;
@@ -273,29 +273,42 @@ body {
 
 .myg-sidebar {
     width: 260px;
-    background: var(--myg-sidebar-bg);
+    background: var(--myg-white);
     flex-shrink: 0;
     overflow-y: auto;
+    border-right: 1px solid var(--myg-border);
 }
 
 .myg-logo {
     padding: 16px 20px;
-    color: var(--myg-white);
-    font-size: 18px;
-    font-weight: 500;
-    letter-spacing: 0.5px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     display: flex;
     align-items: center;
-    gap: 10px;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--myg-border);
 }
 
-.myg-logo::before {
-    content: '';
+.myg-logo-text {
+    font-size: 18px;
+    font-weight: 400;
+    color: var(--myg-text);
+    letter-spacing: -0.5px;
+}
+
+.myg-logo-text span {
+    color: var(--myg-primary);
+    font-weight: 700;
+}
+
+.myg-logo-icon {
     width: 28px;
     height: 28px;
     background: var(--myg-primary);
-    border-radius: 4px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 14px;
 }
 
 .myg-nav {
@@ -308,15 +321,17 @@ body {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    padding: 10px 20px;
-    color: rgba(255, 255, 255, 0.9);
+    padding: 10px 16px;
+    color: var(--myg-text);
     cursor: default;
-    transition: background 0.15s ease;
+    transition: all 0.15s ease;
     border-left: 3px solid transparent;
+    margin: 2px 8px;
+    border-radius: 4px;
 }
 
 .nav-item:hover {
-    background: var(--myg-sidebar-hover);
+    background: var(--myg-bg);
 }
 
 .nav-item.has-access {
@@ -325,6 +340,7 @@ body {
 
 .nav-item.has-access:hover {
     border-left-color: var(--myg-primary);
+    background: var(--myg-primary-light);
 }
 
 .nav-item.no-access {
@@ -333,73 +349,99 @@ body {
 
 .nav-item.no-access .nav-name {
     text-decoration: line-through;
+    color: var(--myg-text-light);
 }
 
 .nav-icon {
     margin-right: 12px;
     font-size: 16px;
-    width: 20px;
-    text-align: center;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--myg-text-secondary);
+}
+
+.nav-item.has-access .nav-icon {
+    color: var(--myg-text);
 }
 
 .nav-name {
     flex: 1;
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 400;
 }
 
 .access-badge {
     color: var(--myg-success);
     font-size: 14px;
-    font-weight: 500;
+    font-weight: 600;
 }
 
 .denied-badge {
-    color: #FF8A80;
+    color: var(--myg-danger);
     font-size: 14px;
-    font-weight: 500;
+    font-weight: 600;
 }
 
 .nav-children {
     width: 100%;
     list-style: none;
     margin: 4px 0 0;
-    padding: 0 0 0 32px;
+    padding: 0 0 0 36px;
 }
 
 .nav-children li {
-    padding: 6px 8px;
-    font-size: 12px;
-    color: rgba(255, 255, 255, 0.75);
+    padding: 8px 12px;
+    font-size: 13px;
+    color: var(--myg-text-secondary);
     display: flex;
     justify-content: space-between;
     align-items: center;
-    border-radius: 3px;
+    border-radius: 4px;
+    margin: 2px 0;
 }
 
 .nav-children li:hover {
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--myg-bg);
 }
 
 .nav-children li.has-access {
     opacity: 1;
+    color: var(--myg-text);
 }
 
 .nav-children li.no-access {
     opacity: 0.5;
     text-decoration: line-through;
+    color: var(--myg-text-light);
 }
 
 .child-badge {
     color: var(--myg-success);
-    font-size: 11px;
-    margin-left: 8px;
+    font-size: 12px;
+    font-weight: 600;
 }
 
 .child-denied {
-    color: #FF8A80;
-    font-size: 11px;
-    margin-left: 8px;
+    color: var(--myg-danger);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+/* Active/Selected nav item styling */
+.nav-item.has-access.active,
+.nav-item.has-access:first-child {
+    color: var(--myg-primary);
+    background: var(--myg-primary-light);
+    border-left-color: var(--myg-primary);
+}
+
+.nav-item.has-access.active .nav-name,
+.nav-item.has-access:first-child .nav-name {
+    font-weight: 500;
+    color: var(--myg-primary);
 }
 
 /* Stat Cards */
@@ -607,12 +649,16 @@ body {
 }
 
 .myg-sidebar::-webkit-scrollbar-track {
-    background: rgba(255, 255, 255, 0.1);
+    background: var(--myg-bg);
 }
 
 .myg-sidebar::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.3);
+    background: var(--myg-border);
     border-radius: 4px;
+}
+
+.myg-sidebar::-webkit-scrollbar-thumb:hover {
+    background: var(--myg-text-light);
 }
 
 .modal-body::-webkit-scrollbar-track,
