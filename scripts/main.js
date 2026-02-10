@@ -424,7 +424,27 @@ function openModal(clearance) {
         }
     });
 
-    const isFullAccess = securityFilters.length === 0;
+    // Determine access level
+    // GroupEverythingSecurityId or "Everything" filter = full access
+    // GroupNothingSecurityId = no access
+    const clearanceIdLower = (clearance.id || '').toLowerCase();
+    const clearanceNameLower = (clearance.name || '').toLowerCase();
+
+    const isFullAccess = clearanceIdLower === 'groupeverythingsecurityid' ||
+                         clearanceIdLower.includes('everything') ||
+                         clearanceNameLower.includes('everything') ||
+                         allowedFeatures.has('Everything') ||
+                         allowedFeatures.has('EverythingSecurity');
+
+    const isNoAccess = clearanceIdLower === 'groupnothingsecurityid' ||
+                       clearanceIdLower.includes('nothing') ||
+                       clearanceNameLower.includes('nothing') ||
+                       allowedFeatures.has('Nothing') ||
+                       allowedFeatures.has('NothingSecurity');
+
+    console.log('Clearance:', clearance.name, 'isFullAccess:', isFullAccess, 'isNoAccess:', isNoAccess);
+    console.log('Security filters:', securityFilters);
+    console.log('Allowed features:', Array.from(allowedFeatures));
 
     // Render navigation preview
     navPreview.innerHTML = navigationStructure.map(navItem => {
