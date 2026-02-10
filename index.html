@@ -9,8 +9,16 @@
 <body>
     <div id="app">
         <header class="page-header">
-            <h1>Clearance Preview</h1>
-            <p class="subtitle">Select a clearance to preview its access permissions</p>
+            <div class="header-top">
+                <div>
+                    <h1>Clearance Preview</h1>
+                    <p class="subtitle">Select a clearance to preview its access permissions</p>
+                </div>
+                <button class="btn btn-primary" onclick="openMonitoringSettings()">
+                    <span class="btn-icon">🔔</span>
+                    Monitoring Settings
+                </button>
+            </div>
         </header>
 
         <div id="loading" class="loading">
@@ -50,6 +58,65 @@
                             <div id="feature-list"></div>
                         </div>
                     </main>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Monitoring Settings Modal -->
+    <div id="monitoring-modal" class="modal">
+        <div class="modal-content modal-medium">
+            <div class="modal-header">
+                <h2>Monitoring Settings</h2>
+                <button class="close-btn" onclick="closeMonitoringModal()">&times;</button>
+            </div>
+            <div class="modal-body modal-body-padded">
+                <p class="modal-description">Configure email notifications when clearance permissions change.</p>
+
+                <div class="form-section">
+                    <h3>Select Clearances to Monitor</h3>
+                    <p class="form-hint">Choose which clearances you want to track for changes</p>
+                    <div id="clearance-checkboxes" class="checkbox-grid">
+                        <!-- Populated by JavaScript -->
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h3>Select Users to Notify</h3>
+                    <p class="form-hint">Choose who should receive email notifications</p>
+                    <div class="user-search">
+                        <input type="text" id="user-search-input" placeholder="Search users..." class="form-input" oninput="filterUsers()">
+                    </div>
+                    <div id="user-checkboxes" class="checkbox-grid checkbox-grid-users">
+                        <!-- Populated by JavaScript -->
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h3>Notification Frequency</h3>
+                    <div class="radio-group">
+                        <label class="radio-label">
+                            <input type="radio" name="frequency" value="5" checked> Every 5 minutes
+                        </label>
+                        <label class="radio-label">
+                            <input type="radio" name="frequency" value="15"> Every 15 minutes
+                        </label>
+                        <label class="radio-label">
+                            <input type="radio" name="frequency" value="60"> Every hour
+                        </label>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button class="btn btn-secondary" onclick="closeMonitoringModal()">Cancel</button>
+                    <button class="btn btn-primary" onclick="saveMonitoringSettings()">
+                        <span class="btn-icon">💾</span>
+                        Save Settings
+                    </button>
+                </div>
+
+                <div id="monitoring-status" class="monitoring-status" style="display: none;">
+                    <!-- Status messages will appear here -->
                 </div>
             </div>
         </div>

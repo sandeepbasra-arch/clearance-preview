@@ -769,6 +769,237 @@ function setupEventListeners() {
     }
 }
 
+// ============================================
+// MONITORING FUNCTIONALITY
+// ============================================
+
+let users = []; // Will be populated from MyGeotab
+let monitoringSettings = {
+    clearances: [],
+    users: [],
+    frequency: 5
+};
+
+/**
+ * Load monitoring settings from localStorage
+ */
+function loadMonitoringSettings() {
+    try {
+        const saved = localStorage.getItem('clearanceMonitoringSettings');
+        if (saved) {
+            monitoringSettings = JSON.parse(saved);
+        }
+    } catch (e) {
+        console.error('Error loading monitoring settings:', e);
+    }
+}
+
+/**
+ * Save monitoring settings to localStorage
+ */
+function saveMonitoringSettingsToStorage() {
+    try {
+        localStorage.setItem('clearanceMonitoringSettings', JSON.stringify(monitoringSettings));
+    } catch (e) {
+        console.error('Error saving monitoring settings:', e);
+    }
+}
+
+/**
+ * Open the monitoring settings modal
+ */
+window.openMonitoringSettings = function() {
+    loadMonitoringSettings();
+
+    const modal = document.getElementById('monitoring-modal');
+    const clearanceCheckboxes = document.getElementById('clearance-checkboxes');
+    const userCheckboxes = document.getElementById('user-checkboxes');
+
+    // Populate clearance checkboxes
+    clearanceCheckboxes.innerHTML = clearances.map(c => `
+        <label class="checkbox-label ${monitoringSettings.clearances.includes(c.id) ? 'checked' : ''}">
+            <input type="checkbox" value="${c.id}"
+                   ${monitoringSettings.clearances.includes(c.id) ? 'checked' : ''}
+                   onchange="toggleCheckboxLabel(this)">
+            <span title="${escapeHtml(c.name)}">${escapeHtml(c.name)}</span>
+        </label>
+    `).join('');
+
+    // Fetch users if in MyGeotab mode
+    if (!isStandalone && api) {
+        fetchUsers();
+    } else {
+        // Demo mode - show sample users
+        users = [
+            { id: 'user1', name: 'John Smith', email: 'john.smith@example.com' },
+            { id: 'user2', name: 'Jane Doe', email: 'jane.doe@example.com' },
+            { id: 'user3', name: 'Mike Johnson', email: 'mike.j@example.com' },
+            { id: 'user4', name: 'Sarah Wilson', email: 'sarah.w@example.com' }
+        ];
+        renderUserCheckboxes();
+    }
+
+    // Set frequency radio
+    const frequencyRadios = document.querySelectorAll('input[name="frequency"]');
+    frequencyRadios.forEach(radio => {
+        radio.checked = parseInt(radio.value) === monitoringSettings.frequency;
+    });
+
+    modal.classList.add('open');
+    document.body.style.overflow = 'hidden';
+};
+
+/**
+ * Fetch users from MyGeotab
+ */
+function fetchUsers() {
+    const userCheckboxes = document.getElementById('user-checkboxes');
+    userCheckboxes.innerHTML = '<div class="loading"><div class="spinner"></div> Loading users...</div>';
+
+    api.call('Get', {
+        typeName: 'User',
+        search: {}
+    }, function(result) {
+        users = result.map(u => ({
+            id: u.id,
+            name: u.name || `${u.firstName || ''} ${u.lastName || ''}`.trim() || u.id,
+            email: u.email || ''
+        })).filter(u => u.email); // Only users with email
+
+        users.sort((a, b) => a.name.localeCompare(b.name));
+        renderUserCheckboxes();
+    }, function(error) {
+        console.error('Error fetching users:', error);
+        userCheckboxes.innerHTML = '<p class="error-message">Failed to load users</p>';
+    });
+}
+
+/**
+ * Render user checkboxes
+ */
+function renderUserCheckboxes() {
+    const userCheckboxes = document.getElementById('user-checkboxes');
+    userCheckboxes.innerHTML = users.map(u => `
+        <label class="checkbox-label ${monitoringSettings.users.includes(u.id) ? 'checked' : ''}" data-name="${u.name.toLowerCase()}" data-email="${u.email.toLowerCase()}">
+            <input type="checkbox" value="${u.id}"
+                   ${monitoringSettings.users.includes(u.id) ? 'checked' : ''}
+                   onchange="toggleCheckboxLabel(this)">
+            <span title="${escapeHtml(u.email)}">${escapeHtml(u.name)}</span>
+        </label>
+    `).join('');
+}
+
+/**
+ * Filter users based on search input
+ */
+window.filterUsers = function() {
+    const searchInput = document.getElementById('user-search-input');
+    const searchTerm = searchInput.value.toLowerCase();
+    const labels = document.querySelectorAll('#user-checkboxes .checkbox-label');
+
+    labels.forEach(label => {
+        const name = label.dataset.name || '';
+        const email = label.dataset.email || '';
+        const matches = name.includes(searchTerm) || email.includes(searchTerm);
+        label.style.display = matches ? '' : 'none';
+    });
+};
+
+/**
+ * Toggle checkbox label styling
+ */
+window.toggleCheckboxLabel = function(checkbox) {
+    const label = checkbox.closest('.checkbox-label');
+    if (checkbox.checked) {
+        label.classList.add('checked');
+    } else {
+        label.classList.remove('checked');
+    }
+};
+
+/**
+ * Close the monitoring modal
+ */
+window.closeMonitoringModal = function() {
+    const modal = document.getElementById('monitoring-modal');
+    modal.classList.remove('open');
+    document.body.style.overflow = '';
+
+    // Clear search
+    const searchInput = document.getElementById('user-search-input');
+    if (searchInput) searchInput.value = '';
+
+    // Hide status
+    const status = document.getElementById('monitoring-status');
+    if (status) status.style.display = 'none';
+};
+
+/**
+ * Save monitoring settings
+ */
+window.saveMonitoringSettings = function() {
+    const status = document.getElementById('monitoring-status');
+
+    // Gather selected clearances
+    const clearanceInputs = document.querySelectorAll('#clearance-checkboxes input[type="checkbox"]:checked');
+    monitoringSettings.clearances = Array.from(clearanceInputs).map(input => input.value);
+
+    // Gather selected users
+    const userInputs = document.querySelectorAll('#user-checkboxes input[type="checkbox"]:checked');
+    monitoringSettings.users = Array.from(userInputs).map(input => input.value);
+
+    // Get frequency
+    const frequencyInput = document.querySelector('input[name="frequency"]:checked');
+    monitoringSettings.frequency = parseInt(frequencyInput.value);
+
+    // Validate
+    if (monitoringSettings.clearances.length === 0) {
+        showMonitoringStatus('Please select at least one clearance to monitor.', 'error');
+        return;
+    }
+
+    if (monitoringSettings.users.length === 0) {
+        showMonitoringStatus('Please select at least one user to notify.', 'error');
+        return;
+    }
+
+    // Save to localStorage
+    saveMonitoringSettingsToStorage();
+
+    // Get selected user and clearance names for display
+    const selectedClearanceNames = clearances
+        .filter(c => monitoringSettings.clearances.includes(c.id))
+        .map(c => c.name);
+    const selectedUserNames = users
+        .filter(u => monitoringSettings.users.includes(u.id))
+        .map(u => u.name);
+
+    showMonitoringStatus(
+        `Settings saved! Monitoring ${selectedClearanceNames.length} clearance(s). ` +
+        `${selectedUserNames.length} user(s) will be notified every ${monitoringSettings.frequency} minutes.`,
+        'success'
+    );
+
+    console.log('Monitoring settings saved:', monitoringSettings);
+
+    // In a real implementation, this would also push to Google Sheets
+    // For now, we'll just save locally
+};
+
+/**
+ * Show status message in monitoring modal
+ */
+function showMonitoringStatus(message, type) {
+    const status = document.getElementById('monitoring-status');
+    status.textContent = message;
+    status.className = `monitoring-status ${type}`;
+    status.style.display = 'block';
+}
+
+// ============================================
+// INITIALIZATION
+// ============================================
+
 // Initialize based on mode
 console.log('Clearance Preview: isStandalone =', isStandalone);
 console.log('Clearance Preview: geotab object =', typeof geotab);

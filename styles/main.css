@@ -55,6 +55,13 @@ body {
     border-bottom: 1px solid var(--myg-border);
 }
 
+.header-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+}
+
 .page-header h1 {
     margin: 0 0 4px;
     color: var(--myg-secondary);
@@ -68,6 +75,44 @@ body {
     color: var(--myg-text-secondary);
     font-size: 14px;
     font-weight: 400;
+}
+
+/* Buttons */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    font-size: 14px;
+    font-weight: 500;
+    border: none;
+    border-radius: var(--myg-radius);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.btn-icon {
+    font-size: 16px;
+}
+
+.btn-primary {
+    background: var(--myg-primary);
+    color: white;
+}
+
+.btn-primary:hover {
+    background: var(--myg-primary-dark);
+    box-shadow: 0 2px 8px rgba(0, 161, 224, 0.3);
+}
+
+.btn-secondary {
+    background: var(--myg-bg-dark);
+    color: var(--myg-text);
+    border: 1px solid var(--myg-border);
+}
+
+.btn-secondary:hover {
+    background: var(--myg-border);
 }
 
 /* Loading State */
@@ -263,6 +308,166 @@ body {
 .modal-body {
     flex: 1;
     overflow: auto;
+}
+
+.modal-body-padded {
+    padding: 24px;
+}
+
+.modal-medium {
+    max-width: 700px;
+}
+
+.modal-description {
+    margin: 0 0 24px;
+    color: var(--myg-text-secondary);
+    font-size: 14px;
+}
+
+/* Form Elements */
+.form-section {
+    margin-bottom: 28px;
+}
+
+.form-section h3 {
+    margin: 0 0 8px;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--myg-secondary);
+}
+
+.form-hint {
+    margin: 0 0 12px;
+    font-size: 13px;
+    color: var(--myg-text-light);
+}
+
+.form-input {
+    width: 100%;
+    padding: 10px 14px;
+    font-size: 14px;
+    border: 1px solid var(--myg-border);
+    border-radius: var(--myg-radius);
+    transition: all 0.15s ease;
+}
+
+.form-input:focus {
+    outline: none;
+    border-color: var(--myg-primary);
+    box-shadow: 0 0 0 3px rgba(0, 161, 224, 0.1);
+}
+
+.checkbox-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 8px;
+    max-height: 200px;
+    overflow-y: auto;
+    padding: 12px;
+    background: var(--myg-bg);
+    border-radius: var(--myg-radius);
+    border: 1px solid var(--myg-border-light);
+}
+
+.checkbox-grid-users {
+    max-height: 180px;
+    margin-top: 12px;
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: var(--myg-white);
+    border-radius: var(--myg-radius);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    border: 1px solid transparent;
+}
+
+.checkbox-label:hover {
+    background: var(--myg-primary-light);
+    border-color: var(--myg-primary);
+}
+
+.checkbox-label input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--myg-primary);
+    cursor: pointer;
+}
+
+.checkbox-label span {
+    font-size: 13px;
+    color: var(--myg-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.checkbox-label.checked {
+    background: var(--myg-primary-light);
+    border-color: var(--myg-primary);
+}
+
+.user-search {
+    margin-bottom: 0;
+}
+
+.radio-group {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+}
+
+.radio-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    color: var(--myg-text);
+    cursor: pointer;
+}
+
+.radio-label input[type="radio"] {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--myg-primary);
+    cursor: pointer;
+}
+
+.form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    padding-top: 20px;
+    border-top: 1px solid var(--myg-border-light);
+}
+
+.monitoring-status {
+    margin-top: 20px;
+    padding: 12px 16px;
+    border-radius: var(--myg-radius);
+    font-size: 14px;
+}
+
+.monitoring-status.success {
+    background: #E8F5E9;
+    color: #2E7D32;
+    border: 1px solid #C8E6C9;
+}
+
+.monitoring-status.error {
+    background: #FFEBEE;
+    color: #C62828;
+    border: 1px solid #FFCDD2;
+}
+
+.monitoring-status.info {
+    background: var(--myg-primary-light);
+    color: var(--myg-primary-dark);
+    border: 1px solid var(--myg-primary);
 }
 
 /* MyGeotab Preview Layout - Light Sidebar Style */
