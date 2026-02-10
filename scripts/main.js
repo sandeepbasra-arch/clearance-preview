@@ -534,6 +534,57 @@ function openModal(clearance) {
 
     // Get security filters for this clearance
     const securityFilters = clearance.securityFilters || [];
+
+    // Collect securityId references that need to be resolved
+    const securityIdRefs = [];
+    securityFilters.forEach(filter => {
+        if (filter.securityId && filter.securityId.id) {
+            securityIdRefs.push(filter.securityId.id);
+        }
+    });
+
+    // If there are securityId references, resolve them first
+    if (securityIdRefs.length > 0 && !isStandalone && api) {
+        console.log('Resolving security ID references:', securityIdRefs);
+
+        // Build multicall to fetch all referenced security groups
+        const calls = securityIdRefs.map(id => ['Get', { typeName: 'Group', search: { id: id } }]);
+
+        api.multiCall(calls, function(results) {
+            const resolvedNames = new Map();
+            results.forEach((result, index) => {
+                if (result && result.length > 0) {
+                    const group = result[0];
+                    let name = group.name || '';
+                    // Clean up the name - remove ** markers
+                    name = name.replace(/^\*\*/, '').replace(/\*\*$/, '');
+                    resolvedNames.set(securityIdRefs[index], name);
+                    console.log(`Resolved ${securityIdRefs[index]} -> ${name}`);
+                }
+            });
+
+            // Now render with resolved names
+            renderModalContent(clearance, securityFilters, resolvedNames);
+        }, function(error) {
+            console.error('Error resolving security IDs:', error);
+            // Fall back to rendering without resolved names
+            renderModalContent(clearance, securityFilters, new Map());
+        });
+    } else {
+        // No security ID references to resolve, or in standalone mode
+        renderModalContent(clearance, securityFilters, new Map());
+    }
+}
+
+/**
+ * Render the modal content after resolving security IDs
+ */
+function renderModalContent(clearance, securityFilters, resolvedNames) {
+    const modal = document.getElementById('preview-modal');
+    const navPreview = document.getElementById('nav-preview');
+    const accessSummary = document.getElementById('access-summary');
+    const featureList = document.getElementById('feature-list');
+
     const allowedFeatures = new Set();
 
     securityFilters.forEach(filter => {
@@ -542,15 +593,26 @@ function openModal(clearance) {
         if (filter.securityIdentifier) {
             allowedFeatures.add(filter.securityIdentifier);
         }
-        // Format 2: { securityId: { id: 'GroupXxxSecurityId' } } - extract from securityId object
+        // Format 2: { securityId: { id: 'GroupXxxSecurityId' } } - resolve to actual name
         if (filter.securityId) {
             if (typeof filter.securityId === 'string') {
                 allowedFeatures.add(filter.securityId);
             } else if (filter.securityId.id) {
-                // The id often looks like 'GroupViewDeviceDataSecurityId' - extract the feature name
-                let id = filter.securityId.id;
+                const id = filter.securityId.id;
+
+                // Use resolved name if available
+                if (resolvedNames.has(id)) {
+                    const resolvedName = resolvedNames.get(id);
+                    allowedFeatures.add(resolvedName);
+                    // Also add cleaned version for pattern matching
+                    const cleanName = resolvedName.replace(/Security$/, '');
+                    if (cleanName !== resolvedName) {
+                        allowedFeatures.add(cleanName);
+                    }
+                }
+
+                // Also add the raw ID and cleaned version as fallback
                 allowedFeatures.add(id);
-                // Also add a cleaned version without Group/SecurityId prefix/suffix for pattern matching
                 if (id.startsWith('Group') && id.endsWith('SecurityId')) {
                     const cleanId = id.replace(/^Group/, '').replace(/SecurityId$/, '');
                     allowedFeatures.add(cleanId);
@@ -559,7 +621,7 @@ function openModal(clearance) {
         }
     });
 
-    console.log('Extracted security identifiers:', Array.from(allowedFeatures));
+    console.log('Allowed features after resolution:', Array.from(allowedFeatures));
 
     // Determine access level
     // GroupEverythingSecurityId or "Everything" filter = full access
