@@ -239,57 +239,45 @@ function fetchClearances() {
         return;
     }
 
-    // Real MyGeotab mode
-    console.log('Fetching groups to find security clearances...');
+    // Real MyGeotab mode - get security clearances from users' securityGroups
+    console.log('Fetching security clearances...');
 
+    // Get all users to find all unique security groups being used
     api.call('Get', {
-        typeName: 'Group',
+        typeName: 'User',
         search: {}
-    }, function (allGroups) {
-        console.log('Total groups:', allGroups.length);
+    }, function (users) {
+        console.log('Total users:', users.length);
 
-        // Log first 20 groups to see structure
-        console.log('Sample groups:', allGroups.slice(0, 20).map(g => ({
-            id: g.id,
-            name: g.name,
-            parent: g.parent ? g.parent.id : null
-        })));
+        // Collect all unique security groups from all users
+        const securityGroupMap = new Map();
 
-        // Find all unique parent IDs to understand hierarchy
-        const parentIds = [...new Set(allGroups.map(g => g.parent ? g.parent.id : 'none'))];
-        console.log('All parent IDs:', parentIds);
-
-        // Look for groups that might be security clearances
-        // Check multiple patterns
-        clearances = allGroups.filter(group => {
-            const id = (group.id || '');
-            const name = (group.name || '').toLowerCase();
-
-            // Known security clearance patterns
-            if (id === 'GroupEverythingSecurityId' ||
-                id === 'GroupNothingSecurityId' ||
-                id === 'GroupSupervisorsSecurityId' ||
-                id === 'GroupViewOnlySecurityId' ||
-                id === 'GroupDriveUserSecurityId') {
-                return true;
+        users.forEach(user => {
+            if (user.securityGroups && user.securityGroups.length > 0) {
+                user.securityGroups.forEach(sg => {
+                    if (sg.id && !securityGroupMap.has(sg.id)) {
+                        securityGroupMap.set(sg.id, {
+                            id: sg.id,
+                            name: sg.name || sg.id,
+                            comments: 'Security clearance used in this database'
+                        });
+                    }
+                });
             }
-
-            // Check if ID contains security patterns
-            if (id.includes('Security') && id !== 'GroupSecurityId') {
-                return true;
-            }
-
-            return false;
         });
 
+        clearances = Array.from(securityGroupMap.values());
         console.log('Security clearances found:', clearances.length);
-        console.log('Clearances:', clearances.map(c => ({ id: c.id, name: c.name })));
+        console.log('Clearances:', clearances);
+
+        // Sort by name
+        clearances.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
         loading.style.display = 'none';
         renderClearances();
 
     }, function (error) {
-        console.error('Failed to load groups:', error);
+        console.error('Failed to load users:', error);
         showError('Failed to load clearances: ' + error.message);
     });
 }
