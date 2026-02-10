@@ -718,7 +718,15 @@ window.showPreview = function (clearanceId) {
             // Determine access level based on parent
             if (parentInfo) {
                 fullClearance.parentLevel = parentInfo.level;
+                fullClearance.parentId = parentInfo.parentId;
                 fullClearance.inheritsFullAccess = parentInfo.level === 'full' || parentInfo.level === 'supervisor';
+
+                // Get the parent group's securityFilters for non-full-access parents
+                if (!fullClearance.inheritsFullAccess && builtInGroups[parentInfo.parentId]) {
+                    const parentGroup = builtInGroups[parentInfo.parentId].group;
+                    fullClearance.parentSecurityFilters = parentGroup?.securityFilters || [];
+                    console.log('Parent security filters:', fullClearance.parentSecurityFilters.length);
+                }
             } else {
                 // If we can't find the parent, check if it's a built-in group itself
                 if (builtInGroups[clearanceId]) {
@@ -846,15 +854,33 @@ function renderModalContent(clearance, securityFilters) {
     // If so, use exception pattern: full access minus isAdd:false items
     const inheritsFullAccess = clearance.inheritsFullAccess || false;
     const parentLevel = clearance.parentLevel || 'unknown';
+    const parentFilters = clearance.parentSecurityFilters || [];
 
     // For full/supervisor: exception pattern (full access minus denials)
-    // For drive/user/viewonly: additive pattern (only isAdd:true items)
+    // For drive/user/viewonly: use parent's filters as base, apply child's overrides
     // For nothing: no access
     const actualExceptPattern = inheritsFullAccess && addFalseCount > 0;
 
     console.log('Filter counts:', `${addTrueCount} grants, ${addFalseCount} denials`);
     console.log('Parent level:', parentLevel);
+    console.log('Parent filters count:', parentFilters.length);
     console.log('Inherits full access:', inheritsFullAccess, '-> Exception pattern:', actualExceptPattern);
+
+    // For non-full-access parents with securityFilters, add their allowed permissions to our set
+    if (!inheritsFullAccess && parentFilters.length > 0) {
+        console.log('=== Processing Parent Filters ===');
+        parentFilters.forEach((filter, index) => {
+            // Parent's isAdd:true (or undefined) items are our base allowed permissions
+            if (filter.isAdd !== false) {
+                const names = extractFeatureNames(filter);
+                names.forEach(name => allowedFeatures.add(name));
+                if (index < 5) {
+                    console.log(`Parent filter ${index + 1}: ${filter.securityIdentifier || filter.securityId?.name || 'unknown'}, isAdd: ${filter.isAdd}`);
+                }
+            }
+        });
+        console.log('After adding parent filters, allowed features:', allowedFeatures.size);
+    }
 
     securityFilters.forEach((filter, index) => {
         const featureNames = extractFeatureNames(filter);
