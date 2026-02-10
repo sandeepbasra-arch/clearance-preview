@@ -234,12 +234,136 @@ const navigationStructure = [
 ];
 
 /**
- * Check if a security identifier matches any of the patterns
- * Uses case-insensitive partial matching
+ * Parse a permission name into its feature component
+ * Handles formats like:
+ * - SecurityIdViewHOSLogsId -> ViewHOSLogs
+ * - SecurityIdManageMediaId -> ManageMedia
+ * - ViewSecurityId -> (meta permission, skip)
+ * - ViewMap -> ViewMap
  */
-function matchesSecurityPattern(securityId, patterns) {
-    const idLower = securityId.toLowerCase();
-    return patterns.some(pattern => idLower.includes(pattern.toLowerCase()));
+function parsePermissionName(name) {
+    if (!name) return null;
+
+    // Skip meta permissions that don't grant feature access
+    if (name === 'ViewSecurityId' || name === 'SecurityId') {
+        return null;
+    }
+
+    // Parse SecurityId<Action><Feature>Id format
+    if (name.startsWith('SecurityId') && name.endsWith('Id')) {
+        return name.replace(/^SecurityId/, '').replace(/Id$/, '');
+    }
+
+    // Parse Group<Feature>SecurityId format
+    if (name.startsWith('Group') && name.endsWith('SecurityId')) {
+        return name.replace(/^Group/, '').replace(/SecurityId$/, '');
+    }
+
+    return name;
+}
+
+/**
+ * Map parsed permission names to nav item keywords
+ * More specific than partial matching
+ */
+const permissionToNavMapping = {
+    // HOS
+    'ViewHOSLogs': ['HOS'],
+    'ManageHOSLogs': ['HOS'],
+    // DVIR
+    'ViewDVIRLogs': ['DVIR'],
+    'ManageDVIRLogs': ['DVIR'],
+    'CertifyDVIR': ['DVIR'],
+    'RepairDVIR': ['DVIR'],
+    'InspectDVIR': ['DVIR'],
+    // Media/Video
+    'ViewMedia': ['Video', 'Media'],
+    'ManageMedia': ['Video', 'Media'],
+    // Shipments
+    'ViewShipments': ['Shipment'],
+    'ManageShipments': ['Shipment'],
+    // Trailers
+    'ViewTrailers': ['Trailer'],
+    'ManageTrailers': ['Trailer'],
+    // Routes
+    'ViewRoute': ['Route'],
+    'ViewAdvancedRoute': ['Route'],
+    // Driver
+    'ViewDriverAnalytics': ['Driver'],
+    'ViewDriverClockInOut': ['Driver'],
+    // Risk
+    'ViewRiskManagementReportOption': ['Risk'],
+    'RiskAnalyticsViewAndDownloadAssetAndDriverReports': ['Risk', 'Safety'],
+    // Vehicle Analytics
+    'ViewVehicleAnalytics': ['Vehicle', 'Asset'],
+    // Coaching
+    'ViewCoachingSession': ['Safety', 'Driver'],
+    // EV
+    'ViewEVPerformanceData': ['EV', 'Electric'],
+    // Add-ins
+    'LaunchAddIn': ['Addin'],
+    'ViewAddInData': ['Addin'],
+    'ManageAddInData': ['Addin'],
+    // Navigation
+    'ViewNavigation': ['Map'],
+    // Exceptions
+    'ExceptionEventReviewParticipant': ['Exception'],
+    // Map
+    'ViewMap': ['Map'],
+    'AdministerLiveMap': ['Map'],
+    // Dashboard
+    'Dashboard': ['Dashboard'],
+    // Trip
+    'Trip': ['Trip'],
+    'TripsActivityReport': ['Trip'],
+    // Zone
+    'Zone': ['Zone'],
+    'ZoneList': ['Zone'],
+    // Device
+    'Device': ['Device', 'Vehicle', 'Asset'],
+    'DeviceList': ['Device', 'Vehicle', 'Asset'],
+    'DeviceAdmin': ['Device', 'Vehicle', 'Asset'],
+    // Engine
+    'Engine': ['Engine', 'Maintenance'],
+    'EngineStatusDataGraph': ['Engine', 'Maintenance'],
+    // Fuel
+    'Fuel': ['Fuel'],
+    'FuelUsageReport': ['Fuel'],
+    // User/Admin
+    'User': ['User'],
+    'UserAdmin': ['User'],
+    // Report
+    'Report': ['Report'],
+    // Sustainability
+    'Sustainability': ['Sustainability'],
+    'SustainabilityReport': ['Sustainability'],
+    // Tachograph
+    'Tachograph': ['Tachograph']
+};
+
+/**
+ * Check if a permission grants access to a nav item
+ */
+function permissionGrantsAccess(permission, navPatterns) {
+    // First try direct mapping
+    const mappedKeywords = permissionToNavMapping[permission];
+    if (mappedKeywords) {
+        return navPatterns.some(pattern =>
+            mappedKeywords.some(keyword =>
+                keyword.toLowerCase() === pattern.toLowerCase()
+            )
+        );
+    }
+
+    // Fallback: check if permission name contains any nav pattern
+    // But be more strict - require the pattern to be a word boundary
+    const permLower = permission.toLowerCase();
+    return navPatterns.some(pattern => {
+        const patternLower = pattern.toLowerCase();
+        // Check for exact word match or word boundary match
+        const regex = new RegExp('\\b' + patternLower + '\\b', 'i');
+        return regex.test(permLower);
+    });
 }
 
 /**
@@ -247,7 +371,13 @@ function matchesSecurityPattern(securityId, patterns) {
  */
 function hasAccessToNavItem(allowedFeatures, patterns) {
     for (const feature of allowedFeatures) {
-        if (matchesSecurityPattern(feature, patterns)) {
+        // Parse the permission name
+        const parsed = parsePermissionName(feature);
+        if (parsed && permissionGrantsAccess(parsed, patterns)) {
+            return true;
+        }
+        // Also check the raw feature name
+        if (permissionGrantsAccess(feature, patterns)) {
             return true;
         }
     }
@@ -271,15 +401,18 @@ const keySecurityFeatures = [
     { id: 'Route', name: 'Routes', category: 'Productivity' },
     { id: 'Zone', name: 'Zones', category: 'Productivity' },
 
-    // Safety
-    { id: 'Exception', name: 'Exceptions', category: 'Safety' },
+    // Safety - matches left nav structure
+    { id: 'Collision', name: 'Collision Risk', category: 'Safety' },
     { id: 'Risk', name: 'Risk Management', category: 'Safety' },
-    { id: 'Collision', name: 'Collision Detection', category: 'Safety' },
+    { id: 'DriverSafety', name: 'Driver Safety Scorecard', category: 'Safety' },
+    { id: 'Exception', name: 'Exceptions', category: 'Safety' },
+    { id: 'Aggressive', name: 'Aggressive Driving', category: 'Safety' },
 
-    // Video
-    { id: 'Video', name: 'Video Access', category: 'Video' },
-    { id: 'Camera', name: 'Camera Management', category: 'Video' },
-    { id: 'Media', name: 'Media Files', category: 'Video' },
+    // Video - matches left nav structure
+    { id: 'VideoEvents', name: 'Video Events', category: 'Video' },
+    { id: 'LiveVideo', name: 'Live Video', category: 'Video' },
+    { id: 'VideoRequests', name: 'Video Requests', category: 'Video' },
+    { id: 'CameraHealth', name: 'Camera Health', category: 'Video' },
 
     // Compliance
     { id: 'HOS', name: 'Hours of Service', category: 'Compliance' },
@@ -306,22 +439,28 @@ const keySecurityFeatures = [
     { id: 'Export', name: 'Data Export', category: 'Reports' },
     { id: 'Schedule', name: 'Scheduled Reports', category: 'Reports' },
 
-    // Administration
-    { id: 'User', name: 'User Management', category: 'Admin' },
-    { id: 'Driver', name: 'Driver Management', category: 'Admin' },
-    { id: 'Group', name: 'Group Management', category: 'Admin' },
-    { id: 'Rule', name: 'Rule Management', category: 'Admin' },
-    { id: 'Audit', name: 'Audit Logs', category: 'Admin' },
-    { id: 'Addin', name: 'Add-In Management', category: 'Admin' },
-    { id: 'Security', name: 'Security Settings', category: 'Admin' }
+    // Administration - matches left nav structure
+    { id: 'User', name: 'Users', category: 'Admin' },
+    { id: 'Driver', name: 'Drivers', category: 'Admin' },
+    { id: 'Security', name: 'Clearances', category: 'Admin' },
+    { id: 'System', name: 'System Settings', category: 'Admin' },
+    { id: 'Addin', name: 'Add-Ins', category: 'Admin' },
+    { id: 'Audit', name: 'Audit Log', category: 'Admin' }
 ];
 
 /**
  * Check if a feature is enabled based on allowed features
+ * Uses the same permission parsing and mapping as nav items
  */
 function isFeatureEnabled(allowedFeatures, featureId) {
     for (const feature of allowedFeatures) {
-        if (feature.toLowerCase().includes(featureId.toLowerCase())) {
+        // Parse the permission name
+        const parsed = parsePermissionName(feature);
+        if (parsed && permissionGrantsAccess(parsed, [featureId])) {
+            return true;
+        }
+        // Also check the raw feature name
+        if (permissionGrantsAccess(feature, [featureId])) {
             return true;
         }
     }
@@ -565,9 +704,10 @@ function renderModalContent(clearance, securityFilters) {
 
     // Check if this clearance uses "isAdd: false" pattern (inherits from parent, removes specific items)
     // If ALL filters have isAdd: false, this is an "everything except" clearance
-    const hasAnyAddTrue = securityFilters.some(f => f.isAdd === true);
-    const hasAllAddFalse = securityFilters.length > 0 && securityFilters.every(f => f.isAdd === false);
-    const isExceptPattern = hasAllAddFalse && !hasAnyAddTrue;
+    // These old variables are replaced by the counting logic below
+    // const hasAnyAddTrue = securityFilters.some(f => f.isAdd === true);
+    // const hasAllAddFalse = securityFilters.length > 0 && securityFilters.every(f => f.isAdd === false);
+    // const isExceptPattern = hasAllAddFalse && !hasAnyAddTrue;
 
     // Check how many filters are add-in specific vs main navigation
     const mainNavFilters = securityFilters.filter(f =>
@@ -578,7 +718,7 @@ function renderModalContent(clearance, securityFilters) {
     );
     console.log('Main nav filters:', mainNavFilters.length, 'Add-in filters:', addinFilters.length);
 
-    console.log('Security filter pattern: isExceptPattern =', isExceptPattern, '(inherits full access, removes specific items)');
+    // Moved to after counting logic
 
     // Helper to extract feature names from a filter
     function extractFeatureNames(filter) {
@@ -614,7 +754,28 @@ function renderModalContent(clearance, securityFilters) {
     // Track camera/video specific denied permissions separately
     const deniedVideoFeatures = new Set();
 
-    securityFilters.forEach(filter => {
+    console.log('=== Processing Security Filters ===');
+    console.log('First 3 raw filters:', securityFilters.slice(0, 3));
+
+    // Count isAdd values to understand the pattern
+    let addTrueCount = 0;
+    let addFalseCount = 0;
+    let addOtherCount = 0;
+
+    securityFilters.forEach((filter, index) => {
+        if (filter.isAdd === true) addTrueCount++;
+        else if (filter.isAdd === false) addFalseCount++;
+        else addOtherCount++;
+    });
+
+    console.log(`isAdd counts: true=${addTrueCount}, false=${addFalseCount}, other=${addOtherCount}`);
+
+    // Determine the pattern based on actual counts
+    // If ALL or MOST filters have isAdd: false, treat as exception pattern (full access minus denials)
+    const actualExceptPattern = addFalseCount > 0 && addTrueCount === 0;
+    console.log('Actual except pattern (all isAdd:false, no isAdd:true):', actualExceptPattern);
+
+    securityFilters.forEach((filter, index) => {
         const featureNames = extractFeatureNames(filter);
 
         // Check if this has a customPageName (add-in specific permission)
@@ -622,56 +783,64 @@ function renderModalContent(clearance, securityFilters) {
                               filter.securityId.customPageName &&
                               filter.securityId.customPageName !== '';
 
-        if (filter.isAdd === false) {
-            // For add-in specific permissions, only handle known denied cases
+        const filterName = filter.securityId?.name || filter.securityIdentifier || 'unknown';
+
+        // Only log first 5 and last 2 to avoid spam
+        if (index < 5 || index >= securityFilters.length - 2) {
+            console.log(`Filter ${index + 1}: ${filterName}, isAdd: ${filter.isAdd}`);
+        }
+
+        // For except pattern: isAdd:false means DENIED
+        // For additive pattern: isAdd:true means ALLOWED
+        if (filter.isAdd === true) {
+            // Explicitly granted
+            featureNames.forEach(name => allowedFeatures.add(name));
+        } else if (filter.isAdd === false) {
+            // Check if this is a video-related denial
             if (hasCustomPage) {
                 const name = filter.securityId.name || '';
-                // Only ViewCameraLiveVideo actually denies Live Video access
-                // Other camera permissions don't necessarily mean denied
-                if (name === 'ViewCameraLiveVideo') {
+                if (name === 'ViewCameraLiveVideo' || name.includes('LiveVideo')) {
                     deniedVideoFeatures.add('Live Video');
-                    console.log('Live Video denied via:', name);
                 }
-                // Skip all other add-in permissions - they don't affect main navigation
-            } else {
-                // Main navigation permission without customPageName
-                // Be very specific - only known denied cases
-                const name = filter.securityId?.name || filter.securityIdentifier || '';
-
-                // Skip generic ViewSecurityId - it doesn't deny main nav items
-                if (name === 'ViewSecurityId' || name.includes('SecurityId')) {
-                    console.log('Skipping generic security permission:', name);
-                    return;
-                }
-
-                // ViewDriverSafety specifically affects Driver Safety Scorecard only
-                if (name === 'ViewDriverSafety' || name.includes('DriverSafety')) {
-                    deniedFeatures.add('Driver Safety Scorecard');
-                    console.log('Driver Safety Scorecard denied via:', name);
-                }
-                // Don't add other permissions to denied - isAdd:false in except pattern means inherited
             }
-        } else {
-            // This permission is being GRANTED
-            featureNames.forEach(name => allowedFeatures.add(name));
+
+            // For exception pattern, add to denied features (these are being removed from full access)
+            if (actualExceptPattern) {
+                // Parse the permission name and add to denied
+                const permName = filter.securityIdentifier || filter.securityId?.name || '';
+                const parsed = parsePermissionName(permName);
+                if (parsed) {
+                    deniedFeatures.add(parsed);
+                }
+            }
         }
     });
 
     console.log('Denied main features:', Array.from(deniedFeatures));
     console.log('Denied video features:', Array.from(deniedVideoFeatures));
 
-    console.log('Allowed features:', Array.from(allowedFeatures));
+    // Parse and show the meaningful permission names
+    const parsedAllowed = [];
+    allowedFeatures.forEach(feature => {
+        const parsed = parsePermissionName(feature);
+        if (parsed) {
+            parsedAllowed.push(parsed);
+        }
+    });
+    console.log('Allowed features (raw):', Array.from(allowedFeatures));
+    console.log('Allowed features (parsed):', parsedAllowed);
     console.log('Denied features:', Array.from(deniedFeatures));
 
     // Determine access level
     // GroupEverythingSecurityId or "Everything" filter = full access
     // GroupNothingSecurityId = no access
-    // isExceptPattern = inherits full access from parent, with specific denials
+    // Exception pattern (all isAdd:false) = inherits full access from parent, with specific denials
     const clearanceIdLower = (clearance.id || '').toLowerCase();
     const clearanceNameLower = (clearance.name || '').toLowerCase();
 
-    // If using "except" pattern (all filters are isAdd:false), this inherits full access with exceptions
-    const isFullAccess = isExceptPattern ||
+    // If using "except" pattern (all/most filters are isAdd:false with no isAdd:true),
+    // this inherits full access with exceptions
+    const isFullAccess = actualExceptPattern ||
                          clearanceIdLower === 'groupeverythingsecurityid' ||
                          clearanceIdLower.includes('everything') ||
                          clearanceNameLower.includes('everything') ||
@@ -684,24 +853,34 @@ function renderModalContent(clearance, securityFilters) {
                        allowedFeatures.has('Nothing') ||
                        allowedFeatures.has('NothingSecurity');
 
-    console.log('Clearance:', clearance.name, 'isFullAccess:', isFullAccess, 'isNoAccess:', isNoAccess, 'isExceptPattern:', isExceptPattern);
-    console.log('Denied features (exceptions):', Array.from(deniedFeatures));
+    console.log('actualExceptPattern:', actualExceptPattern, '(isAdd counts: true=' + addTrueCount + ', false=' + addFalseCount + ')');
+
+    console.log('=== CLEARANCE DEBUG ===');
+    console.log('Clearance:', clearance.name);
+    console.log('Total security filters:', securityFilters.length);
+    console.log('isAdd counts - true:', addTrueCount, 'false:', addFalseCount, 'other:', addOtherCount);
+    console.log('actualExceptPattern:', actualExceptPattern);
+    console.log('isFullAccess:', isFullAccess);
+    console.log('isNoAccess:', isNoAccess);
+    console.log('Allowed features:', Array.from(allowedFeatures));
+    console.log('Denied features (parsed):', Array.from(deniedFeatures));
+    console.log('Denied video features:', Array.from(deniedVideoFeatures));
+    console.log('========================');
 
     // Helper to check if a nav item is explicitly denied
-    function isDeniedNavItem(patterns, itemName) {
+    // Uses the same permission-to-nav mapping as for allowed features
+    function isDeniedNavItem(navPatterns, itemName) {
         if (!itemName) return false;
 
-        const itemNameLower = itemName.toLowerCase().replace(/\s+/g, '');
-
-        // Check main denied features - exact name match only
+        // Check if any denied feature maps to this nav item's patterns
         for (const denied of deniedFeatures) {
-            const deniedLower = denied.toLowerCase().replace(/\s+/g, '');
-            if (itemNameLower === deniedLower) {
+            if (permissionGrantsAccess(denied, navPatterns)) {
                 return true;
             }
         }
 
-        // Check video-specific denied features - exact name match only
+        // Check video-specific denied features
+        const itemNameLower = itemName.toLowerCase().replace(/\s+/g, '');
         for (const denied of deniedVideoFeatures) {
             const deniedLower = denied.toLowerCase().replace(/\s+/g, '');
             if (itemNameLower === deniedLower) {
@@ -768,7 +947,7 @@ function renderModalContent(clearance, securityFilters) {
         accessIcon = '🚫';
         accessLabel = 'No Access';
         statClass = 'stat-none';
-    } else if (isExceptPattern) {
+    } else if (actualExceptPattern) {
         accessIcon = '👑';
         accessLabel = 'Full (with exceptions)';
         statClass = 'stat-full';
