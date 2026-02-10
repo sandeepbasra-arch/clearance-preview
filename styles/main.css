@@ -287,6 +287,11 @@ body {
     border-bottom: 1px solid var(--myg-border);
 }
 
+.myg-logo-img {
+    height: 24px;
+    width: auto;
+}
+
 .myg-logo-text {
     font-size: 18px;
     font-weight: 400;
