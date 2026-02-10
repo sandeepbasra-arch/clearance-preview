@@ -632,7 +632,7 @@ function renderModalContent(clearance, securityFilters, resolvedNames) {
             } else if (filter.securityId.id) {
                 const id = filter.securityId.id;
 
-                // Use resolved name if available
+                // Use resolved name if available from API lookup
                 if (resolvedNames.has(id)) {
                     const resolvedName = resolvedNames.get(id);
                     allowedFeatures.add(resolvedName);
@@ -643,11 +643,20 @@ function renderModalContent(clearance, securityFilters, resolvedNames) {
                     }
                 }
 
-                // Also add the raw ID and cleaned version as fallback
+                // Also add the raw ID
                 allowedFeatures.add(id);
-                if (id.startsWith('Group') && id.endsWith('SecurityId')) {
+
+                // Extract feature name from various ID formats:
+                // 'SecurityIdViewDriverSafetyId' -> 'ViewDriverSafety'
+                // 'GroupViewDeviceDataSecurityId' -> 'ViewDeviceData'
+                if (id.startsWith('SecurityId') && id.endsWith('Id')) {
+                    const cleanId = id.replace(/^SecurityId/, '').replace(/Id$/, '');
+                    allowedFeatures.add(cleanId);
+                    console.log(`Extracted from SecurityId pattern: ${id} -> ${cleanId}`);
+                } else if (id.startsWith('Group') && id.endsWith('SecurityId')) {
                     const cleanId = id.replace(/^Group/, '').replace(/SecurityId$/, '');
                     allowedFeatures.add(cleanId);
+                    console.log(`Extracted from Group pattern: ${id} -> ${cleanId}`);
                 }
             }
         }
