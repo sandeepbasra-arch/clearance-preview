@@ -467,6 +467,26 @@ body {
     font-style: italic;
 }
 
+/* Feature Categories */
+.feature-categories {
+    margin-top: 16px;
+}
+
+.feature-category {
+    margin-bottom: 20px;
+}
+
+.feature-category h4 {
+    margin: 0 0 10px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--myg-text);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid var(--myg-border);
+    padding-bottom: 6px;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     .myg-preview {

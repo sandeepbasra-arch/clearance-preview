@@ -232,6 +232,70 @@ function hasAccessToNavItem(allowedFeatures, patterns) {
     return false;
 }
 
+// Key security features organized by category - used to show enabled vs disabled
+const keySecurityFeatures = [
+    // Map & Dashboard
+    { id: 'Dashboard', name: 'Dashboard', category: 'Core' },
+    { id: 'Map', name: 'Map View', category: 'Core' },
+    { id: 'LiveMap', name: 'Live Map', category: 'Core' },
+
+    // Assets & Devices
+    { id: 'DeviceList', name: 'View Devices', category: 'Assets' },
+    { id: 'DeviceAdmin', name: 'Manage Devices', category: 'Assets' },
+    { id: 'DeviceAdminAdvanced', name: 'Advanced Device Admin', category: 'Assets' },
+
+    // Productivity
+    { id: 'Trip', name: 'Trips', category: 'Productivity' },
+    { id: 'Route', name: 'Routes', category: 'Productivity' },
+    { id: 'Zone', name: 'Zones', category: 'Productivity' },
+
+    // Safety
+    { id: 'Exception', name: 'Exceptions', category: 'Safety' },
+    { id: 'Risk', name: 'Risk Management', category: 'Safety' },
+    { id: 'Collision', name: 'Collision Detection', category: 'Safety' },
+
+    // Compliance
+    { id: 'HOS', name: 'Hours of Service', category: 'Compliance' },
+    { id: 'DVIR', name: 'DVIR Logs', category: 'Compliance' },
+    { id: 'Tachograph', name: 'Tachograph', category: 'Compliance' },
+
+    // Maintenance
+    { id: 'Engine', name: 'Engine Data', category: 'Maintenance' },
+    { id: 'Maintenance', name: 'Maintenance', category: 'Maintenance' },
+    { id: 'Diagnostic', name: 'Diagnostics', category: 'Maintenance' },
+
+    // Fuel & Energy
+    { id: 'Fuel', name: 'Fuel Management', category: 'Fuel & Energy' },
+    { id: 'EV', name: 'Electric Vehicles', category: 'Fuel & Energy' },
+    { id: 'Charge', name: 'Charging', category: 'Fuel & Energy' },
+
+    // Sustainability
+    { id: 'Sustainability', name: 'Sustainability', category: 'Sustainability' },
+    { id: 'Emission', name: 'Emissions', category: 'Sustainability' },
+    { id: 'Idling', name: 'Idling Reports', category: 'Sustainability' },
+
+    // Administration
+    { id: 'User', name: 'User Management', category: 'Admin' },
+    { id: 'Driver', name: 'Driver Management', category: 'Admin' },
+    { id: 'Group', name: 'Group Management', category: 'Admin' },
+    { id: 'Rule', name: 'Rule Management', category: 'Admin' },
+    { id: 'Audit', name: 'Audit Logs', category: 'Admin' },
+    { id: 'Addin', name: 'Add-In Management', category: 'Admin' },
+    { id: 'Security', name: 'Security Settings', category: 'Admin' }
+];
+
+/**
+ * Check if a feature is enabled based on allowed features
+ */
+function isFeatureEnabled(allowedFeatures, featureId) {
+    for (const feature of allowedFeatures) {
+        if (feature.toLowerCase().includes(featureId.toLowerCase())) {
+            return true;
+        }
+    }
+    return false;
+}
+
 // Shared state
 let api = null;
 let state = null;
@@ -548,24 +612,75 @@ function openModal(clearance) {
         ${clearance.comments ? `<p class="clearance-comments"><strong>Description:</strong> ${escapeHtml(clearance.comments)}</p>` : ''}
     `;
 
-    // Render feature list
+    // Render feature list - show both enabled (green) and disabled (red)
     if (isNoAccess) {
-        featureList.innerHTML = '<p class="no-access-message">🚫 This clearance has no access to any features.</p>';
-    } else if (securityFilters.length > 0) {
+        // Show all features as disabled
+        const categories = [...new Set(keySecurityFeatures.map(f => f.category))];
         featureList.innerHTML = `
-            <div class="feature-grid">
-                ${securityFilters.map(filter => `
-                    <div class="feature-item allowed">
-                        <span class="feature-icon">✓</span>
-                        <span class="feature-name">${filter.securityIdentifier || 'Unknown'}</span>
+            <p class="no-access-message">🚫 This clearance has no access to any features.</p>
+            <div class="feature-categories">
+                ${categories.map(category => `
+                    <div class="feature-category">
+                        <h4>${category}</h4>
+                        <div class="feature-grid">
+                            ${keySecurityFeatures.filter(f => f.category === category).map(feature => `
+                                <div class="feature-item denied">
+                                    <span class="feature-icon">✕</span>
+                                    <span class="feature-name">${feature.name}</span>
+                                </div>
+                            `).join('')}
+                        </div>
                     </div>
                 `).join('')}
             </div>
         `;
     } else if (isFullAccess) {
-        featureList.innerHTML = '<p class="full-access">👑 This clearance has full access to all features.</p>';
+        // Show all features as enabled
+        const categories = [...new Set(keySecurityFeatures.map(f => f.category))];
+        featureList.innerHTML = `
+            <p class="full-access">👑 This clearance has full access to all features.</p>
+            <div class="feature-categories">
+                ${categories.map(category => `
+                    <div class="feature-category">
+                        <h4>${category}</h4>
+                        <div class="feature-grid">
+                            ${keySecurityFeatures.filter(f => f.category === category).map(feature => `
+                                <div class="feature-item allowed">
+                                    <span class="feature-icon">✓</span>
+                                    <span class="feature-name">${feature.name}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
     } else {
-        featureList.innerHTML = '<p class="no-features">No specific security features defined for this clearance.</p>';
+        // Show mixed enabled/disabled based on security filters
+        const categories = [...new Set(keySecurityFeatures.map(f => f.category))];
+        featureList.innerHTML = `
+            <div class="feature-categories">
+                ${categories.map(category => {
+                    const categoryFeatures = keySecurityFeatures.filter(f => f.category === category);
+                    return `
+                        <div class="feature-category">
+                            <h4>${category}</h4>
+                            <div class="feature-grid">
+                                ${categoryFeatures.map(feature => {
+                                    const enabled = isFeatureEnabled(allowedFeatures, feature.id);
+                                    return `
+                                        <div class="feature-item ${enabled ? 'allowed' : 'denied'}">
+                                            <span class="feature-icon">${enabled ? '✓' : '✕'}</span>
+                                            <span class="feature-name">${feature.name}</span>
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+        `;
     }
 
     modal.classList.add('open');
@@ -636,7 +751,9 @@ if (isStandalone) {
 } else {
     // MyGeotab mode - register add-in
     console.log('Clearance Preview: Registering with MyGeotab');
-    geotab.addin.clearancePreview = function () {
+
+    // Create the add-in handler function
+    const createAddinHandler = function () {
         'use strict';
 
         return {
@@ -661,4 +778,8 @@ if (isStandalone) {
             }
         };
     };
+
+    // Register both stable and dev versions
+    geotab.addin.clearancePreview = createAddinHandler;
+    geotab.addin.clearancePreviewDev = createAddinHandler;
 }
