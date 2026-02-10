@@ -346,11 +346,12 @@ function buildSecurityIdMap(callback) {
 
     console.log('Building security ID map...');
 
-    // Fetch all groups that are children of GroupSecurityId
+    // Fetch all security identifier groups - try GroupEverythingSecurityId for full permission list
     api.call('Get', {
         typeName: 'Group',
         search: {
-            id: 'GroupSecurityId'
+            id: 'GroupEverythingSecurityId',
+            includeGroups: true
         }
     }, function(result) {
         if (result && result.length > 0) {
@@ -582,9 +583,13 @@ function openModal(clearance) {
     // Get security filters for this clearance
     const securityFilters = clearance.securityFilters || [];
 
+    // Log full security filter structure for debugging
+    console.log('Raw security filters:', JSON.stringify(securityFilters, null, 2));
+
     // Collect securityId references that need to be resolved
     const securityIdRefs = [];
-    securityFilters.forEach(filter => {
+    securityFilters.forEach((filter, idx) => {
+        console.log(`Filter ${idx}:`, filter);
         if (filter.securityId && filter.securityId.id) {
             securityIdRefs.push(filter.securityId.id);
         }
