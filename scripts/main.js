@@ -715,37 +715,49 @@ window.showPreview = function (clearanceId) {
             let parentInfo = findParentLevel(clearanceId);
             console.log('Parent info:', parentInfo);
 
-            // Log the parent property to understand its structure
-            console.log('Clearance parent property:', fullClearance.parent);
-
-            // If not found as direct child, check the clearance's parent property
+            // If not found as direct child, search through all clearances to find who has this as a child
             // This handles grandchildren (e.g., Geotab Test → Company Car → GroupDriveUserSecurityId)
-            // The parent might be an object with id, or just a string ID
-            const parentRef = fullClearance.parent;
-            const immediateParentId = parentRef ? (parentRef.id || (typeof parentRef === 'string' ? parentRef : null)) : null;
+            if (!parentInfo) {
+                console.log('Searching for parent among all clearances...');
 
-            if (!parentInfo && immediateParentId) {
-                console.log('Checking immediate parent:', immediateParentId);
+                // Find which clearance has this one as a child
+                let immediateParentId = null;
+                for (const c of clearances) {
+                    if (c.children && c.children.length > 0) {
+                        for (const child of c.children) {
+                            if (child.id === clearanceId) {
+                                immediateParentId = c.id;
+                                console.log('Found parent clearance:', c.name || c.id);
+                                break;
+                            }
+                        }
+                    }
+                    if (immediateParentId) break;
+                }
 
-                // Check if immediate parent is a built-in group
-                if (builtInGroups[immediateParentId]) {
-                    parentInfo = {
-                        parentId: immediateParentId,
-                        level: builtInGroups[immediateParentId].level,
-                        depth: 1
-                    };
-                    console.log('Immediate parent is built-in:', immediateParentId);
-                } else {
-                    // Check if immediate parent is a child of a built-in group
-                    const grandparentInfo = findParentLevel(immediateParentId);
-                    if (grandparentInfo) {
-                        console.log('Found grandparent:', grandparentInfo);
+                if (immediateParentId) {
+                    console.log('Checking immediate parent:', immediateParentId);
+
+                    // Check if immediate parent is a built-in group
+                    if (builtInGroups[immediateParentId]) {
                         parentInfo = {
-                            parentId: grandparentInfo.parentId,
-                            level: grandparentInfo.level,
-                            depth: 2,
-                            intermediateParentId: immediateParentId
+                            parentId: immediateParentId,
+                            level: builtInGroups[immediateParentId].level,
+                            depth: 1
                         };
+                        console.log('Immediate parent is built-in:', immediateParentId);
+                    } else {
+                        // Check if immediate parent is a child of a built-in group
+                        const grandparentInfo = findParentLevel(immediateParentId);
+                        if (grandparentInfo) {
+                            console.log('Found grandparent:', grandparentInfo);
+                            parentInfo = {
+                                parentId: grandparentInfo.parentId,
+                                level: grandparentInfo.level,
+                                depth: 2,
+                                intermediateParentId: immediateParentId
+                            };
+                        }
                     }
                 }
             }
