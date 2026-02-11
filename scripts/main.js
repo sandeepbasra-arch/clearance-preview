@@ -712,8 +712,44 @@ window.showPreview = function (clearanceId) {
                 return null;
             }
 
-            const parentInfo = findParentLevel(clearanceId);
+            let parentInfo = findParentLevel(clearanceId);
             console.log('Parent info:', parentInfo);
+
+            // If not found as direct child, check the clearance's parent property
+            // This handles grandchildren (e.g., Geotab Test → Company Car → GroupDriveUserSecurityId)
+            if (!parentInfo && fullClearance.parent && fullClearance.parent.id) {
+                const immediateParentId = fullClearance.parent.id;
+                console.log('Checking immediate parent:', immediateParentId);
+
+                // Check if immediate parent is a built-in group
+                if (builtInGroups[immediateParentId]) {
+                    parentInfo = {
+                        parentId: immediateParentId,
+                        level: builtInGroups[immediateParentId].level,
+                        depth: 1
+                    };
+                    console.log('Immediate parent is built-in:', immediateParentId);
+                } else {
+                    // Check if immediate parent is a child of a built-in group
+                    const grandparentInfo = findParentLevel(immediateParentId);
+                    if (grandparentInfo) {
+                        console.log('Found grandparent:', grandparentInfo);
+                        parentInfo = {
+                            parentId: grandparentInfo.parentId,
+                            level: grandparentInfo.level,
+                            depth: 2,
+                            intermediateParentId: immediateParentId
+                        };
+                    }
+                }
+            }
+
+            // Function to finalize and open modal
+            function finalizeAndOpen() {
+                console.log('Parent level:', fullClearance.parentLevel);
+                console.log('Inherits full access:', fullClearance.inheritsFullAccess);
+                openModal(fullClearance);
+            }
 
             // Determine access level based on parent
             if (parentInfo) {
@@ -724,8 +760,37 @@ window.showPreview = function (clearanceId) {
                 // Get the parent group's securityFilters for non-full-access parents
                 if (!fullClearance.inheritsFullAccess && builtInGroups[parentInfo.parentId]) {
                     const parentGroup = builtInGroups[parentInfo.parentId].group;
-                    fullClearance.parentSecurityFilters = parentGroup?.securityFilters || [];
-                    console.log('Parent security filters:', fullClearance.parentSecurityFilters.length);
+                    const builtInFilters = parentGroup?.securityFilters || [];
+
+                    // If there's an intermediate parent (grandchild case), fetch its filters too
+                    if (parentInfo.intermediateParentId) {
+                        console.log('Fetching intermediate parent filters:', parentInfo.intermediateParentId);
+                        api.call('Get', {
+                            typeName: 'Group',
+                            search: { id: parentInfo.intermediateParentId }
+                        }, function (intermediateResult) {
+                            if (intermediateResult && intermediateResult.length > 0) {
+                                const intermediateGroup = intermediateResult[0];
+                                const intermediateFilters = intermediateGroup.securityFilters || [];
+                                console.log('Intermediate parent filters:', intermediateFilters.length);
+
+                                // Combine: built-in base + intermediate modifications
+                                fullClearance.parentSecurityFilters = [...builtInFilters, ...intermediateFilters];
+                                console.log('Combined parent filters:', fullClearance.parentSecurityFilters.length);
+                            } else {
+                                fullClearance.parentSecurityFilters = builtInFilters;
+                            }
+                            finalizeAndOpen();
+                        }, function (error) {
+                            console.error('Error fetching intermediate parent:', error);
+                            fullClearance.parentSecurityFilters = builtInFilters;
+                            finalizeAndOpen();
+                        });
+                        return; // Exit early, finalizeAndOpen will be called in callback
+                    } else {
+                        fullClearance.parentSecurityFilters = builtInFilters;
+                        console.log('Parent security filters:', fullClearance.parentSecurityFilters.length);
+                    }
                 }
             } else {
                 // If we can't find the parent, check if it's a built-in group itself
@@ -738,10 +803,7 @@ window.showPreview = function (clearanceId) {
                 }
             }
 
-            console.log('Parent level:', fullClearance.parentLevel);
-            console.log('Inherits full access:', fullClearance.inheritsFullAccess);
-
-            openModal(fullClearance);
+            finalizeAndOpen();
         } else {
             openModal(clearance);
         }
