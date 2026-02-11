@@ -715,10 +715,16 @@ window.showPreview = function (clearanceId) {
             let parentInfo = findParentLevel(clearanceId);
             console.log('Parent info:', parentInfo);
 
+            // Log the parent property to understand its structure
+            console.log('Clearance parent property:', fullClearance.parent);
+
             // If not found as direct child, check the clearance's parent property
             // This handles grandchildren (e.g., Geotab Test → Company Car → GroupDriveUserSecurityId)
-            if (!parentInfo && fullClearance.parent && fullClearance.parent.id) {
-                const immediateParentId = fullClearance.parent.id;
+            // The parent might be an object with id, or just a string ID
+            const parentRef = fullClearance.parent;
+            const immediateParentId = parentRef ? (parentRef.id || (typeof parentRef === 'string' ? parentRef : null)) : null;
+
+            if (!parentInfo && immediateParentId) {
                 console.log('Checking immediate parent:', immediateParentId);
 
                 // Check if immediate parent is a built-in group
