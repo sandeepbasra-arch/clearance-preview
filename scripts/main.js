@@ -645,106 +645,160 @@ window.showPreview = function (clearanceId) {
     }
 
     // Real mode - fetch full group details including securityFilters
-    // Also fetch the parent groups to understand inheritance
     console.log('Fetching details for clearance:', clearanceId);
 
-    // Fetch the clearance and all built-in security groups
-    api.multiCall([
-        ['Get', { typeName: 'Group', search: { id: clearanceId } }],
-        ['Get', { typeName: 'Group', search: { id: 'GroupEverythingSecurityId' } }],
-        ['Get', { typeName: 'Group', search: { id: 'GroupSupervisorSecurityId' } }],
-        ['Get', { typeName: 'Group', search: { id: 'GroupDriveUserSecurityId' } }],
-        ['Get', { typeName: 'Group', search: { id: 'GroupUserSecurityId' } }],
-        ['Get', { typeName: 'Group', search: { id: 'GroupViewOnlySecurityId' } }],
-        ['Get', { typeName: 'Group', search: { id: 'GroupNothingSecurityId' } }]
-    ], function (results) {
-        const clearanceResult = results[0];
-        const builtInGroups = {
-            'GroupEverythingSecurityId': { group: results[1]?.[0], level: 'full' },
-            'GroupSupervisorSecurityId': { group: results[2]?.[0], level: 'supervisor' },
-            'GroupDriveUserSecurityId': { group: results[3]?.[0], level: 'drive' },
-            'GroupUserSecurityId': { group: results[4]?.[0], level: 'user' },
-            'GroupViewOnlySecurityId': { group: results[5]?.[0], level: 'viewonly' },
-            'GroupNothingSecurityId': { group: results[6]?.[0], level: 'nothing' }
-        };
+    // Built-in security group IDs and their access levels
+    const builtInGroupIds = {
+        'GroupEverythingSecurityId': 'full',
+        'GroupSupervisorSecurityId': 'supervisor',
+        'GroupDriveUserSecurityId': 'drive',
+        'GroupUserSecurityId': 'user',
+        'GroupViewOnlySecurityId': 'viewonly',
+        'GroupNothingSecurityId': 'nothing'
+    };
 
-        if (clearanceResult && clearanceResult.length > 0) {
-            const fullClearance = clearanceResult[0];
-            console.log('Full clearance data:', fullClearance);
+    // Fetch the clearance first
+    api.call('Get', {
+        typeName: 'Group',
+        search: { id: clearanceId }
+    }, function (result) {
+        if (!result || result.length === 0) {
+            openModal(clearance);
+            return;
+        }
 
-            // Clean up name
-            fullClearance.name = (fullClearance.name || clearanceId).replace(/^\*\*/, '').replace(/\*\*$/, '');
+        const fullClearance = result[0];
+        console.log('Full clearance data:', fullClearance);
 
-            // Find which built-in group this clearance is a child/grandchild of
-            function findParentLevel(targetId) {
-                for (const [builtInId, info] of Object.entries(builtInGroups)) {
-                    if (!info.group) continue;
+        // Clean up name
+        fullClearance.name = (fullClearance.name || clearanceId).replace(/^\*\*/, '').replace(/\*\*$/, '');
 
-                    // Check direct children
-                    const children = info.group.children || [];
-                    for (const child of children) {
-                        if (child.id === targetId) {
-                            console.log(`Found ${targetId} as direct child of ${builtInId}`);
-                            return { parentId: builtInId, level: info.level, depth: 1 };
-                        }
-                    }
-                }
+        // Check if this IS a built-in group
+        if (builtInGroupIds[clearanceId]) {
+            fullClearance.parentLevel = builtInGroupIds[clearanceId];
+            fullClearance.inheritsFullAccess = fullClearance.parentLevel === 'full' || fullClearance.parentLevel === 'supervisor';
+            console.log('This IS a built-in group:', clearanceId, fullClearance.parentLevel);
+            openModal(fullClearance);
+            return;
+        }
 
-                // Check grandchildren (depth 2)
-                for (const [builtInId, info] of Object.entries(builtInGroups)) {
-                    if (!info.group) continue;
+        // Traverse up the parent chain to find the built-in ancestor
+        // Collect intermediate parents' security filters along the way
+        const parentChain = [];
 
-                    const children = info.group.children || [];
-                    for (const child of children) {
-                        // Fetch this child's children by checking if it's in another result
-                        // For now, check if it's a custom clearance that might have children
-                        if (child.children) {
-                            for (const grandchild of child.children) {
-                                if (grandchild.id === targetId) {
-                                    console.log(`Found ${targetId} as grandchild of ${builtInId}`);
-                                    return { parentId: builtInId, level: info.level, depth: 2 };
-                                }
-                            }
-                        }
-                    }
-                }
+        function traverseParentChain(currentGroup, callback) {
+            const parentRef = currentGroup.parent;
+            console.log('Checking parent of', currentGroup.name || currentGroup.id, ':', parentRef);
 
-                return null;
+            if (!parentRef || !parentRef.id) {
+                console.log('No parent found for', currentGroup.name || currentGroup.id);
+                callback(null);
+                return;
             }
 
-            const parentInfo = findParentLevel(clearanceId);
-            console.log('Parent info:', parentInfo);
+            const parentId = parentRef.id;
 
-            // Determine access level based on parent
-            if (parentInfo) {
-                fullClearance.parentLevel = parentInfo.level;
-                fullClearance.parentId = parentInfo.parentId;
-                fullClearance.inheritsFullAccess = parentInfo.level === 'full' || parentInfo.level === 'supervisor';
+            // Check if parent is a built-in group
+            if (builtInGroupIds[parentId]) {
+                console.log('Found built-in ancestor:', parentId);
+                // Fetch the built-in group to get its security filters
+                api.call('Get', {
+                    typeName: 'Group',
+                    search: { id: parentId }
+                }, function (parentResult) {
+                    if (parentResult && parentResult.length > 0) {
+                        callback({
+                            builtInId: parentId,
+                            level: builtInGroupIds[parentId],
+                            builtInGroup: parentResult[0],
+                            intermediateParents: parentChain
+                        });
+                    } else {
+                        callback({
+                            builtInId: parentId,
+                            level: builtInGroupIds[parentId],
+                            builtInGroup: null,
+                            intermediateParents: parentChain
+                        });
+                    }
+                }, function (error) {
+                    console.error('Error fetching built-in parent:', error);
+                    callback({
+                        builtInId: parentId,
+                        level: builtInGroupIds[parentId],
+                        builtInGroup: null,
+                        intermediateParents: parentChain
+                    });
+                });
+                return;
+            }
 
-                // Get the parent group's securityFilters for non-full-access parents
-                if (!fullClearance.inheritsFullAccess && builtInGroups[parentInfo.parentId]) {
-                    const parentGroup = builtInGroups[parentInfo.parentId].group;
-                    fullClearance.parentSecurityFilters = parentGroup?.securityFilters || [];
-                    console.log('Parent security filters:', fullClearance.parentSecurityFilters.length);
+            // Parent is an intermediate custom group - fetch it
+            api.call('Get', {
+                typeName: 'Group',
+                search: { id: parentId }
+            }, function (parentResult) {
+                if (parentResult && parentResult.length > 0) {
+                    const parentGroup = parentResult[0];
+                    console.log('Found intermediate parent:', parentGroup.name || parentId, 'with', (parentGroup.securityFilters || []).length, 'filters');
+                    parentChain.push(parentGroup);
+                    // Continue traversing
+                    traverseParentChain(parentGroup, callback);
+                } else {
+                    console.log('Could not fetch parent:', parentId);
+                    callback(null);
+                }
+            }, function (error) {
+                console.error('Error fetching parent:', error);
+                callback(null);
+            });
+        }
+
+        traverseParentChain(fullClearance, function (ancestorInfo) {
+            if (ancestorInfo) {
+                console.log('Ancestor info:', ancestorInfo.builtInId, ancestorInfo.level);
+                console.log('Intermediate parents:', ancestorInfo.intermediateParents.length);
+
+                fullClearance.parentLevel = ancestorInfo.level;
+                fullClearance.parentId = ancestorInfo.builtInId;
+                fullClearance.inheritsFullAccess = ancestorInfo.level === 'full' || ancestorInfo.level === 'supervisor';
+
+                // Build the combined security filters from the inheritance chain
+                // Order: built-in base → intermediate parents (oldest to newest) → this clearance
+                if (!fullClearance.inheritsFullAccess) {
+                    const combinedFilters = [];
+
+                    // Start with built-in group's filters
+                    if (ancestorInfo.builtInGroup && ancestorInfo.builtInGroup.securityFilters) {
+                        combinedFilters.push(...ancestorInfo.builtInGroup.securityFilters);
+                        console.log('Built-in base filters:', ancestorInfo.builtInGroup.securityFilters.length);
+                    }
+
+                    // Add intermediate parents' filters (in order from oldest to newest)
+                    // parentChain is already in order: closest to built-in first
+                    for (let i = ancestorInfo.intermediateParents.length - 1; i >= 0; i--) {
+                        const intermediate = ancestorInfo.intermediateParents[i];
+                        if (intermediate.securityFilters && intermediate.securityFilters.length > 0) {
+                            combinedFilters.push(...intermediate.securityFilters);
+                            console.log('Intermediate parent filters:', intermediate.name || intermediate.id, intermediate.securityFilters.length);
+                        }
+                    }
+
+                    fullClearance.parentSecurityFilters = combinedFilters;
+                    console.log('Total combined parent filters:', combinedFilters.length);
                 }
             } else {
-                // If we can't find the parent, check if it's a built-in group itself
-                if (builtInGroups[clearanceId]) {
-                    fullClearance.parentLevel = builtInGroups[clearanceId].level;
-                    fullClearance.inheritsFullAccess = fullClearance.parentLevel === 'full' || fullClearance.parentLevel === 'supervisor';
-                } else {
-                    fullClearance.parentLevel = 'unknown';
-                    fullClearance.inheritsFullAccess = false;
-                }
+                console.log('Could not find built-in ancestor');
+                fullClearance.parentLevel = 'unknown';
+                fullClearance.inheritsFullAccess = false;
             }
 
             console.log('Parent level:', fullClearance.parentLevel);
             console.log('Inherits full access:', fullClearance.inheritsFullAccess);
 
             openModal(fullClearance);
-        } else {
-            openModal(clearance);
-        }
+        });
+
     }, function (error) {
         console.error('Error fetching clearance details:', error);
         openModal(clearance);
